@@ -1,18 +1,19 @@
-<!-- ABOUTME: Defines normative provider-neutral release invariants and their authority boundaries. -->
-<!-- ABOUTME: Keeps ISLAMU policy independent from renderers, providers, and candidate-controlled inputs. -->
-
 # Release Policy
 
-> **Status:** Approved prospective policy; no release automation is active
+> **Audience:** Maintainers | Release operators | Contributors | AI agents
+> **Status:** Implemented at source level; production signer enrollment and live release rehearsal remain gated on Project Steward approval
 > **Owner:** Platform/Ops and Project Steward
+> **Last Verified:** 2026-11-26
+> **Source Anchors:** `eng/release/`, `.github/workflows/release.yml`, `.github/workflows/_container-build.yml`, `docs/internal/RELEASE_RUNBOOK.md`, `docs/internal/RELEASE_CHECKLIST.md`, `docs/internal/adr/ADR-025-provider-neutral-release-governance.md`
+
+This policy defines the normative invariants and trust boundaries for ISLAMU Event releases. In a conflict, this policy governs release invariants; [ADR-025](adr/ADR-025-provider-neutral-release-governance.md) records the architectural rationale; [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md) defines operator execution and recovery; and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) tracks release-readiness gates.
 
 ## Complete release-impact metadata
 
 License admission covers every tracked product and engineering lock profile,
 including conditional deployment and file-based engineering-tool graphs.
-A pass using a populated developer
-cache does not establish clean-runner restore coverage. Missing package metadata
-remains a failure; profile servicing must not add audit exemptions.
+A pass using a populated developer cache does not establish clean-runner restore coverage.
+Missing package metadata remains a failure; profile servicing must not add audit exemptions.
 
 Review complete changed-file metadata, including previous names for renames.
 A large PR must not bypass impact classification or lower its declared file count.
@@ -21,7 +22,7 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
-## Scope and precedence
+## Scanner, runtime servicing, and advisory coverage boundaries
 
 Scanner admission requires completed analysis for the selected candidate.
 A job budget correction does not waive cancelled or missing query results;
@@ -29,227 +30,190 @@ the [CI execution budget](CI_CD_GOVERNANCE.md#required-repository-settings)
 preserves the full configured suite.
 
 SDK/runtime servicing evidence must cover the component actually delivered:
-package resolution, framework-provided assemblies and self-contained/container
+package resolution, framework-provided assemblies, and self-contained/container
 runtime bytes have distinct ownership. Pruning an obsolete package reference
-does not establish that a deployed runtime is patched. The selected source and
-image baseline is maintained in
+does not establish that a deployed runtime is patched. All four release Dockerfiles
+(`src/Explore.API/Dockerfile`, `src/Explore.Blazor/Dockerfile`, `src/Event.Standalone/Dockerfile`,
+and `src/Event.MigrationService/Dockerfile`) MUST remain aligned to the repository's
+active `.NET 10` SDK and digest-pinned runtime baseline recorded in `global.json` and
 [Operations](OPERATIONS.md#sdk-and-runtime-servicing).
-
-This policy governs the future release engine. It does not replace the current manual
-[Release Checklist](RELEASE_CHECKLIST.md) before activation. In a conflict, this
-policy governs release invariants; [ADR-025](adr/ADR-025-provider-neutral-release-governance.md)
-explains their architecture; [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md) defines operator
-steps.
 
 Codecov publication is advisory shipped-product evidence, not release approval.
 Reports are comparable only within their declared suite scope; incomplete
 runtime lanes must not be presented as complete platform coverage. Its scope and ownership are defined in
 [CI/CD Governance](CI_CD_GOVERNANCE.md#coverage-publication-policy).
 
-## Governed release contract
+## Governed release authority and `git-cliff` boundary
 
-- **The tag is the release.** `refs/tags/v<major>.<minor>.<patch>[-prerelease]` MUST be
-  the sole immutable release identity. Attestation MUST read only the annotated tag
-  object, the preparation commit `B` it targets, the tree at `B`, and ancestry from the
-  base tag. Attestation MUST NOT resolve, compare against, or require any ref under
-  `refs/heads/*`, so a release stays verifiable after the branch that carried its
-  commits advances, is deleted, or was never fetched.
-- Compare-and-swap against an observed branch head is permitted only inside a
-  **mutating** step — the `main` fast-forward proposal and provider push preconditions —
-  where a stale ref is a genuine race. It MUST NOT appear in any verification path.
-- Every release MUST declare a version-line **label** `v<major>.<minor>`. The label
-  classifies the release; it is not a ref and nothing may derive a branch name from it.
+- **The signed annotated tag is the release.** `refs/tags/v<major>.<minor>.<patch>[-prerelease]`
+  MUST be the sole immutable release identity. Tag verification (`verify-release-tag`)
+  MUST enforce an annotated Git tag object (`cat-file -t == tag`), exact embedded `tag`
+  header equality, valid OpenSSH signature against `eng/release/trust/allowed-signers`
+  (`gpg.format=ssh`, `gpg.ssh.allowedSignersFile`), authorized signer principal, and exact
+  target commit / GitHub event SHA binding. Verification MUST NOT depend on any branch ref
+  under `refs/heads/*`, so every release remains verifiable after branches advance or are deleted.
+- **Fail-closed signer root:** `eng/release/trust/allowed-signers` MUST remain comment-only
+  (causing fail-closed `tag_allowed_signers_empty` rejection) until the Project Steward
+  approves and enrolls production release signer public keys.
+- **Version-line label:** every release MUST declare a version-line label `v<major>.<minor>`.
+  The label classifies the release; it is not a ref and nothing may derive a branch name from it.
   `develop` MUST NOT receive generated `Unreleased` changelog writes.
-- ISLAMU policy MUST decide commit validity, visibility, impacts, grouping inputs,
-  SemVer, range/tag selection, trust, and authoritative evidence. git-cliff MUST render
-  normalized context only and MUST NOT decide any of those matters.
-- Normalized input MUST be provider-neutral. Provider metadata MAY appear only in a
-  separate, non-authoritative publication view and MUST NOT alter content hash.
-- The trusted release bundle MUST contain the authoritative engine, policy, context
-  contract, renderer configuration, tool pin, and signer roots. Final attestation
-  MUST verify that promoted bundle before reading candidate data.
-- Candidate source, templates, policy, renderer config, tool locks, and trust roots
-  MUST NOT self-promote or influence authoritative attestation.
+- **C# owns release authority; `git-cliff` owns traversal and Tera rendering:**
+  `ISLAMU.ReleaseEngineering` (`ReleaseContextPolicy`, `ReleaseInputPolicy`, `ReleasePreparation`,
+  `ReleaseArtifactPolicy`, `ReleaseImageManifest`, `ReleaseArtifactManifest`) MUST remain the
+  sole authority for commit validity, visibility, high-impact dispositions, SemVer selection,
+  range/baseline bounds, embargo enforcement, and artifact sealing.
+  - `release-context.v1.json` is the C# authority and evidence artifact.
+  - `release-rendering-context.v1.json` is the separate, allowlisted, identity-free native
+    context array passed to `git-cliff --from-context -` for three-persona Tera rendering
+    (`Community Admin`, `Self-Hoster / Operator`, `Developer / API Integrator`).
+  - `git-cliff --bumped-version` is comparison evidence only; disagreement with the selected
+    stable version in `release.yaml` fails closed.
+- **Verified offline toolchain:** `eng/release/toolchain.lock.json` pins `git-cliff` `2.14.2`
+  across four platforms (`linux-x64`, `linux-arm64`, `osx-arm64`, `windows-x64`) by both archive
+  SHA-256 and extracted executable SHA-256.
+  - `ensure-git-cliff` is the ONLY network-capable provisioning command. `verify-tools`,
+    `prepare`, `diff-contracts`, `seal-artifacts`, and tests MUST never download silently.
+  - Every authoritative `git-cliff` execution MUST verify the binary digest and version and
+    pass `--config`, `--offline`, and `--no-exec` via argument arrays (never a shell) under
+    a scrubbed deterministic environment (`GIT_CLIFF_OFFLINE=1`).
+- **Allowlisted privacy projection (never denylist scrubbing):**
+  Stage 1 (`git-cliff --context`) raw output MUST remain transient in memory and MUST NEVER
+  be persisted or logged. `GitCliffContextEnricher` MUST construct new native release/commit
+  objects solely from an explicit scalar allowlist plus validated curated `extra` metadata,
+  correlating visible and omitted OIDs with C# authority. Authors, committers, emails, raw
+  bodies, footers, remote identities, repository paths, links, timestamps, statistics, and
+  unknown future fields MUST never enter signed artifacts. `ReleaseArtifactPolicy` enforces
+  a second post-render gate before writing `release-notes.md`.
 
-## Release sources and exact identity
+## Commit governance, optional fragments, and embargo boundary
 
-- System utility link-chain and invocation observations MUST NOT replace native
-  executable binding or relax candidate input admission. Infrastructure selection
-  repair requires measured identity and compatible invocation; a successful
-  diagnostic command alone is not release execution evidence.
-  Only the fixed infrastructure stat leaf may resolve to a same-basename,
-  nonlinked target selected once per process. Candidate input link rejection
-  and the existing before/after executable fingerprints MUST remain unchanged.
-  Selector refusal MUST retain a closed owned stat code; inaccessible filesystem
-  selection MUST omit raw paths and exception text.
-  Recognized fixture constructor decoration in native discovery MUST map through
-  the shared complete grammar; register/report equality, opaque UID uniqueness
-  and canonical tuple uniqueness MUST remain unchanged. Constructor display
-  arguments do not replace or expand required authority witness identities.
+- Non-breaking internal commit types (`test`, `refactor`, `style`, `build`, `ci`, `chore`)
+  and engineering scopes (`ci`, `dependencies`, `architecture`, `database`, `observability`,
+  `documentation`, `release`, `testing`, `build`) omit automatically without requiring
+  `Changelog: skip` trailers. Both `CommitPolicy` and `eng/release/cliff.toml` MUST remain
+  parity-tested against the shared corpus (`require_conventional = true`,
+  `protect_breaking_commits = true`, `fail_on_unmatched_commit = true`, no catch-all parser).
+- Breaking changes MUST carry both `!` in the header and a non-empty `BREAKING CHANGE:` footer,
+  MUST remain release-visible regardless of type or scope, and MUST NOT be skipped.
+- Explicit non-breaking opt-out remains supported via `Changelog: skip` paired with a non-empty
+  `Changelog-Reason:` trailer. Blank lines between terminal trailer paragraphs are permitted;
+  duplicate or conflicting declarations fail closed.
+- `.githooks/commit-msg` MUST remain a thin wrapper delegating to `preflight-commit`; range
+  enforcement MUST use `preflight-range --target <ref> --head <ref>` over the bounded range.
+- High-impact public fragments (`docs/internal/releases/changes/CHG-<26 Crockford Base32>.yaml`)
+  are optional for routine changes and required only when referenced by high-impact release
+  dispositions (`breaking`, `security`, `migration`, `configuration`, `openapi`, `operator`).
+  Every staged or referenced fragment MUST pass full `ReleaseInputPolicy.Validate` at preflight.
+- **Human-owned embargo authority:** structural markers (`Public-Disclosure: embargoed` or a
+  `Restricted-Details` YAML key) MUST fail closed before public generation or sealing. Ordinary
+  public prose containing the English word `"restricted"` is permitted.
 
-- Candidate B MUST retain a `security-execution.v1.json` sidecar from actual
-  selected execution at exactly B, together with its contained report/log
-  artifacts. Both required lanes MUST be nonzero, completed and passing.
-  Their exact required methods and variant names MUST match the existing
-  security register's version-2 requirements embedded in the native tool;
-  aggregate counts cannot replace missing named witnesses. Ambiguous TRX
-  summaries or reused cross-lane report identities MUST be rejected.
-  Initial source dispositions and unrelated CI no-ops MUST NOT satisfy this
-  gate. The candidate manifest binds the exact validated packet SHA-256.
-  The sidecar is post-commit execution input, not self-referential content of B.
-  Full provider/host/operator/browser and authenticated-provenance assurance
-  remains separately required; a digest is not producer authentication.
-  The dedicated test-host packet MUST retain `not-attested` provider, role and
-  authentication dimensions rather than asserting an unexecuted runtime profile.
+## Conservative contract evidence limits
 
-- `release.yaml` MUST contain the selected version, release line, fixed release date,
-  range/base references, compatibility references, and impact dispositions.
-- `summary.md` MUST be the sole maintainer-owned public narrative.
-- `release-notes.md` MUST be fully generated from the validated sources and
-  normalized context. It MUST NOT contain manually maintained generated regions.
-- A release MUST finish at one preparation commit `B`. Candidate evidence, the signed
-  annotated tag target, and the stable `main` target for the newest stable release MUST
-  equal the same full Git object `B`. No branch head is part of that equality.
-- Replacement, squash, merge, rebase, or regeneration drift MUST invalidate the
-  candidate and require a new reviewed `B`, because each produces a different object.
+`diff-contracts <base-oid> <head-oid> <output-path>` reads exclusively from pinned Git objects
+(never the dirty working tree) and emits deterministic `contract-diff.v1.json` across three
+ordered families:
 
-## Change identity allocation and correction
+1. **OpenAPI & HAL (`schemas/openapi_islamu-event.json`):** syntax-aware structural diffing.
+   Removed operations/links, required additions, and type/required/security narrowing classify
+   as `breaking`; optional additions classify as `additive`; unresolved `$ref`, extension,
+   default, or unrecognized structural changes classify as `review_required`. Automated JSON
+   diffing does NOT prove runtime or semantic compatibility.
+2. **Configuration contracts (`.env.example`, configuration manifest schema, tenant package schema):**
+   reports variable/property additions, removals, and structural changes while redacting raw
+   secret and default values from `.env.example`.
+3. **EF Core migration ledger:** dynamically discovers `*ModelSnapshot.cs` and migration files
+   at both pinned revisions across persistence assemblies (excluding `.Designer.cs` and snapshots
+   from migration-ID enumeration). Asymmetric provider coverage classifies as `review_required`
+   evidence, NOT proof of defect or provider parity. Real provider apply/idempotency tests and
+   EF Core pending-model checks remain the semantic authority.
 
-- Terminal release trailer paragraphs MAY be separated by blank or
-  whitespace-only lines, including CRLF. Whitespace MUST NOT alter an explicit
-  skip decision. Body prose ends the terminal trailer region.
-- A changelog skip MUST have one nonempty reason. Duplicate or conflicting
-  changelog declarations MUST be rejected even across paragraph separators;
-  breaking changes MUST NOT be skipped and retain their required metadata.
-- The active `commit-msg` hook MUST run native `preflight-commit` against the
-  proposed message and indexed provenance before Git records it. Hook installation
-  MUST honor `core.hooksPath`. Local and CI `preflight-range` remain final enforcement.
+## Source-bound artifact staging, signing, and publication
 
-- New public change identifiers MUST use the release engine's sortable
-  ULID-style `CHG-<26 Crockford Base32 characters>` format. Sequential
-  `CHG-<year>-<number>` identifiers are immutable historical inputs only and
-  MUST NOT be allocated for new work.
-- Fragment creation and footer emission MUST be one operation. The generated
-  identifier is accepted only when it is absent from all visible local refs,
-  existing fragments, and commit-bound correction records.
-- Commit-time validation MUST reject a proposed footer already reachable from
-  the configured target. Pre-merge validation MUST compare the complete
-  `target..head` range before conflict resolution and reject target collisions,
-  duplicate feature IDs, or missing/mismatched fragments.
-- An immutable commit footer MAY be corrected without rewriting history only
-  through one `change-id-rename.v1` record named by and bound to the exact full
-  commit object ID. The record MUST state the old ID, a generated replacement
-  ID, and a bounded reason. It is valid only while the bound commit still
-  carries the old footer.
-- A correction record MUST NOT be a branch alias, wildcard, range mapping,
-  reused replacement, or authority to reinterpret any other commit. Candidate
-  preparation applies the replacement before fragment linkage and records the
-  resulting commit OID plus effective Change-Id in authoritative context. Relevant
-  correction records are included in the candidate's governed release-source
-  digest together with linked fragments.
+1. **Per-release human inputs:** `docs/internal/releases/<version>/release.yaml` and `summary.md`
+   are the sole human-owned per-release inputs committed before tagging. First-release baseline
+   descriptors (`changelog-baseline-YYYY-MM-DD`) verify directly through `GitTagSignatureVerifier`
+   and fail closed once any stable SemVer tag is reachable.
+2. **Pre-build verification and non-clobber guard:** before any container image builds,
+   `.github/workflows/release.yml` MUST run under the protected `release` environment and
+   per-tag non-cancelling concurrency (`cancel-in-progress: false`), verify the signed annotated
+   tag via `verify-release-tag --event-sha`, and query GitHub Releases explicitly (HTTP `404`
+   = absent; HTTP `200` = verify existing sealed release cryptographically as an idempotent
+   no-op or fail closed; any other HTTP status = fail closed). Existing published releases MUST
+   NEVER be replaced or overwritten.
+3. **Digest-only container staging before note rendering:** four multi-arch `.NET 10` OCI indexes
+   (`islamu-event-api`, `islamu-event-ui`, `islamu-event-standalone`, `islamu-event-migration-service`)
+   MUST be built, Trivy-scanned, SBOM/SLSA-attested, and staged via `_container-build.yml` in
+   `push-mode: digest-only` (`push=true,push-by-digest=true,name-canonical=true`), assigning ZERO
+   mutable or version registry tags. GHCR (`ghcr.io/<owner>`) is the built-in primary registry
+   (authenticated with `GITHUB_TOKEN`); an optional secondary OCI registry mirror (for example
+   ATCR, Quay, or another OCI-compliant registry) is configured strictly through GitHub Variables
+   (`vars.CONTAINER_REGISTRY`, `vars.CONTAINER_REGISTRY_USER`) and Secret
+   (`secrets.CONTAINER_REGISTRY_PASSWORD`) with zero hardcoded personal handles or forced third-party
+   hosts in workflow YAML. Only after all four digests and all canonical `registry/repository@sha256:<digest>`
+   references (4 in GHCR-only mode; 8 when a secondary registry is configured) are collected in
+   `release-images.v1.json` may `prepare --image-manifest` render notes, so release notes never
+   advertise unbuilt or aspirational image references.
+4. **Sealing and cryptographic signing:**
+   - `seal-artifacts` validates the exact five generated artifacts (`contract-diff.v1.json`,
+     `release-context.v1.json`, `release-images.v1.json`, `release-notes.md`,
+     `release-rendering-context.v1.json`) with zero missing/extra files, zero symlinks or
+     subdirectories, strict 4-image symmetric registry coverage (each image covering the exact
+     same configured registry set with canonical tagless `@sha256:` references), and post-render
+     note privacy checks, writing canonical `release-artifact-manifest.v1.json` and `SHA256SUMS`
+     (sorted ordinal relative paths, GNU `sha256sum --check` format) without clobbering.
+   - `actions/attest` generates GitHub SLSA Build Provenance attestations for all seven sealed
+     file artifacts (and `_container-build.yml` attests GHCR OCI images).
+   - Cosign (`sigstore/cosign-installer` pinned by full SHA, Cosign `v3.1.5`) signs and verifies
+     **every** published canonical `registry/repository@sha256:<digest>` reference across every
+     configured registry individually (a GHCR signature does not authenticate a mirror reference)
+     and signs `SHA256SUMS` with `cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json`.
+5. **Verified draft publish-once & non-atomicity honesty:**
+   - Exact eight release assets (six files covered by `SHA256SUMS`, `SHA256SUMS`, and
+     `SHA256SUMS.sigstore.json`) upload to a draft GitHub Release without `--clobber`, are
+     re-downloaded and verified byte-for-byte against `SHA256SUMS`, and are published once
+     (`gh release edit --draft=false`).
+   - GitHub and two container registries do NOT commit atomically. Interrupted runs may leave
+     unadvertised digest-only registry objects or an unpublished draft release; reruns verify
+     exact matching state or fail closed without clobbering.
+   - A published release is immutable. Corrections require a new version release and advisory,
+     never asset replacement or tag re-pointing.
+   - SBOM and SLSA provenance establish build origin and contents, NOT byte-for-byte container
+     reproducibility (no reproducible-container claim is made without a two-build equality check).
+6. **Offline vs. online verification boundary:**
+   - `git verify-tag`, `verify-release-tag`, and `sha256sum --check SHA256SUMS` verify tag
+     signatures and file integrity **offline**.
+   - `cosign verify`, `cosign verify-blob`, and `gh attestation verify` verify OIDC signer
+     identity, Fulcio/Rekor transparency proofs, and GitHub SLSA provenance and normally
+     require network access to trust roots / registries / GitHub APIs.
+7. **Model 2 Hybrid Split contributor recognition (`Huquq al-'Ibad`):**
+   - Authoritative signed artifacts remain 100% offline and identity-free.
+   - After sealed publication completes, `append-contributors` executes a separate online
+     `--no-exec` `git-cliff` invocation (`eng/release/cliff-github-contributors.toml`, verified
+     v2.14.2 binary, best-effort `continue-on-error: true`, guarded missing-remote fallback,
+     strict raw-email rejection) to append `@handle` and PR links exclusively to the **mutable
+     GitHub Release page body**.
+   - Network or API failure omits contributor credit without weakening any security gate.
+     Contributors may request edits or removal at any time without breaking cryptographic
+     verification of `release-notes.md` or `SHA256SUMS`.
 
 ## Ref namespace
 
-- Version tags own the `v*` glob outright. Creating any branch matching
-  `refs/heads/v*` MUST be rejected — by provider protected-ref settings and by
-  `ReleaseRefNamespacePolicy` — so no branch can shadow or be confused with a version
-  tag. This is enforced as policy, never resolved as an ambiguity after the fact.
-- Maintenance branches MUST be named `release/<major>.<minor>`. They are **lazy**: none
-  is created at release time. One MAY be opened on demand when a real backport is
-  required, and its only legal source is a verified signed stable tag on that line.
-  Deleting it afterwards is supported and MUST leave every release on that line fully
-  verifiable, because every release is closed by its tag.
+- Version tags own the `v*` glob outright. Creating any branch matching `refs/heads/v*`
+  MUST be rejected by provider branch/tag rulesets so no branch can shadow a version tag.
+- Maintenance branches MUST be named `release/<major>.<minor>`, opened lazily from a verified
+  signed stable tag only when a real backport is required, and may be deleted freely once
+  the line finishes because every release remains verifiable from its tag object alone.
 
-## Trust, determinism, and privacy
+## Public changelog projection
 
-Assurance prerequisite installers retain separately owned, committed dependency
-locks. A restored or installed prerequisite does not attest execution of a
-registered profile; the exact-candidate requirements in the
-[release checklist](RELEASE_CHECKLIST.md#code-and-test-gates) remain separate.
-
-Ambient tracing context is not daemon authority and is not forwarded by the
-dedicated daemon handler. A successful read-only probe is not execution evidence.
-
-Actual selected-engine readiness precedes bounded asynchronous daemon requests.
-Cached proxy metadata does not prove a running VM. Readiness evidence is separate
-from runtime admission and does not extend request deadlines or authorize replay
-after an uncertain mutation.
-
-- The renderer MUST run from the trusted bundle with explicit configuration,
-  `--offline`, and `--no-exec`; it MUST NOT use provider APIs, network configuration,
-  or command processors.
-- Primary file MUST use UTF-8 without BOM, LF, NFC, invariant ordering, a fixed
-  `release.yaml` date, and no current-clock fields. Evidence MUST retain full object
-  IDs; abbreviated display IDs require collision-safe validation.
-- Release tags MUST be SSH-signed annotated tags. Lightweight, unsigned,
-  unauthorized, revoked, or replaced tags MUST fail verification.
-- The first governed release MAY use one explicit lower-bound tag named exactly
-  `changelog-baseline-YYYY-MM-DD` instead of SemVer history, but only after an
-  operator verifies that annotated SSH-signed tag with the promoted bundle and records
-  both the full tag object ID and full target commit ID in `release-baseline.v1`
-  evidence. This baseline is not a release, is not SemVer history, and MUST be ignored
-  by strict SemVer release-tag discovery. The selected version remains an external
-  steward approval decision; tooling MUST NOT infer first-release eligibility from a
-  hardcoded version number.
-- Fake SemVer baselines such as `v0.0.0`, lightweight tags, unsigned tags,
-  unauthorized signers, recreated/moved tags, wrong dates, wrong targets, and short
-  object IDs MUST fail closed. If any governed stable SemVer tag is already reachable
-  from the candidate, baseline lower bounds MUST fail closed and the release MUST use
-  stable SemVer tags as its lower bound.
-- Candidate and final manifests MUST be distinct: the pre-tag candidate digest MAY
-  be referenced by tag text, while post-tag evidence MUST record the tag object ID.
-- Release artifact MUST omit author/committer identities, raw commit bodies,
-  provider identities, tokens, and unbounded error text.
-
-## Disclosure and operation
-
-- Breaking changes MUST NOT be skipped. Every nonbreaking skip MUST include a
-  reviewable reason.
-- High-impact, grouped, migration, configuration, OpenAPI, operator, and public
-  security changes MUST have the structured public evidence required by the release
-  engine. Simple low-impact changes MAY remain commit-subject driven.
-- Embargoed security information MUST remain outside the public checkout and normal
-  public artifacts until authorized disclosure. A public release MAY include only
-  approved disclosure fields.
-- The tool MUST verify and emit evidence; it MUST NOT approve, tag, push, publish,
-  or deploy. A provider adapter MAY perform protected operations only after the
-  independent verification and operator-approval boundaries hold.
-- The historical report design has not shipped. Implementations MUST NOT add
-  compatibility shims for its split-output, candidate-`A`, or renderer-policy model.
-
-## Prospective public changelog publication
-
-Publication MUST remain described as prospective/unverified until retained
-operator evidence proves protected acceptance controls and live GitBook
-synchronization. A local renderer, workflow definition or branch name MUST NOT
-be treated as activation evidence.
-
-- The public changelog MUST contain dated release entries only. General adopter
-  help MUST live separately; projection content MUST remain non-authoritative.
-- The final lane MUST retain a complete finally verified, human-authorized
-  inventory before dispatch, pinned to full annotated tag-object IDs and durable
-  final evidence. The publisher MUST NOT grant disclosure authorization.
-- Reconciliation MUST combine complete retained inventory with last accepted
-  identities across all lines, including absent/coalesced dispatches. Missing
-  inventory, missing evidence, omitted accepted history or moved/deleted tag
-  identities MUST fail closed.
-- Protected `docs/publication` acceptance MUST require independent review and
-  checks without GitBook/publisher bypass. Mutations MUST enforce expected-old
-  commit CAS; changed input unions/digests MUST receive fresh review.
-- GitBook MUST synchronize through separate mutable `docs/gitbook-sync` only.
-  Any app bypass MUST require operator approval restricted to that mirror;
-  write-back MUST NOT automatically merge into protected acceptance. Drift MUST
-  be preserved and repaired only after explicit review.
-- Manifests and receipts MUST retain pinned identities, input/projection digests,
-  accepted commits and bounded outcomes beyond expiring artifacts. Delivery
-  MUST require observed live content, not merely acceptance or a mirror push.
-- Required bot checks MUST actually execute; missing checks MUST leave
-  publication pending, never authorize a bypass. Preview lanes MUST remain
-  secret-free; docs-only writes MUST NOT deploy runtime artifacts.
-- Rotation, retry, publisher upgrade and disable/recovery MUST preserve signed
-  identity. Publication failure MUST NOT invalidate releases, retag, rebuild
-  binaries, move stable `main` or rewrite authoritative notes.
-
-The operator gates are in the
-[activation checklist](RELEASE_CHECKLIST.md#prospective-changelog-publication-activation)
-and [runbook](RELEASE_RUNBOOK.md#governed-changelog-publication-and-activation).
+`docs/public/changelog/README.md` MUST remain an entries-only chronological release ledger
+managed by `sync-public-changelog` (`PublicChangelogPolicy`, sentinel markers
+`<!-- BEGIN GENERATED RELEASES -->` / `<!-- END GENERATED RELEASES -->`, 1 MiB UTF-8 budget,
+optional YAML frontmatter only outside the markers). General adopter upgrade and verification
+guidance lives separately in
+[Releases and Changelog](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md).
+`sync-public-changelog` cryptographically binds every included release directory and linked
+fragment to the exact signed annotated tag tree in Git and fails closed on post-tag edits or
+accepted-page drift.

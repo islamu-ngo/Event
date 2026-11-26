@@ -13,9 +13,18 @@ on:
         required: false
         type: string
         default: "."
-      metadata-tags:
-        required: true
+      push-mode:
+        required: false
         type: string
+        default: "tagged"
+      metadata-tags:
+        required: false
+        type: string
+        default: ""
+      environment:
+        required: false
+        type: string
+        default: ""
       build-configuration:
         required: false
         type: string
@@ -27,13 +36,28 @@ on:
       registry:
         required: false
         type: string
-        default: "atcr.io"
+        default: ""
       registry-user:
-        required: true
+        required: false
         type: string
+        default: ""
+      registry-login-user:
+        required: false
+        type: string
+        default: ""
     secrets:
-      ATCR_PASSWORD:
-        required: true
+      CONTAINER_REGISTRY_PASSWORD:
+        required: false
+    outputs:
+      digest:
+        description: "Immutable OCI index digest (sha256:...) built and pushed to every configured registry."
+        value: ${{ jobs.build.outputs.digest }}
+      ghcr-reference:
+        description: "Canonical GHCR registry/repository@sha256:... reference."
+        value: ${{ jobs.build.outputs.ghcr-reference }}
+      secondary-reference:
+        description: "Optional canonical external OCI registry/repository@sha256:... reference (empty in GHCR-only mode)."
+        value: ${{ jobs.build.outputs.secondary-reference }}
 
 permissions:
   contents: read
@@ -47,11 +71,117 @@ jobs:
     name: Build ${{ inputs.image-name }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment: ${{ inputs.environment }}
 
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
+      digest: ${{ steps.refs.outputs.digest }}
+      ghcr-reference: ${{ steps.refs.outputs.ghcr-reference }}
+      secondary-reference: ${{ steps.refs.outputs.secondary-reference }}
 
     steps:
+      - name: Validate container build inputs and resolve configured registries
+        id: validate
+        shell: bash
+        env:
+          PUSH_MODE: ${{ inputs.push-mode }}
+          METADATA_TAGS: ${{ inputs.metadata-tags }}
+          REGISTRY: ${{ inputs.registry || vars.CONTAINER_REGISTRY }}
+          REGISTRY_USER: ${{ inputs.registry-user || vars.CONTAINER_REGISTRY_USER }}
+          REGISTRY_LOGIN_USER: ${{ inputs.registry-login-user || vars.CONTAINER_REGISTRY_LOGIN_USER }}
+          IMAGE_NAME: ${{ inputs.image-name }}
+          REGISTRY_SECRET_PRESENT: ${{ secrets.CONTAINER_REGISTRY_PASSWORD != '' }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          case "${PUSH_MODE}" in
+            tagged)
+              if [[ -z "${METADATA_TAGS//[[:space:]]/}" ]]; then
+                echo "metadata-tags is required when push-mode=tagged." >&2
+                exit 1
+              fi
+              ;;
+            digest-only)
+              if [[ -n "${METADATA_TAGS//[[:space:]]/}" ]]; then
+                echo "metadata-tags must be empty when push-mode=digest-only; release staging assigns no registry tags." >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Unsupported push-mode '${PUSH_MODE}'. Expected 'tagged' or 'digest-only'." >&2
+              exit 1
+              ;;
+          esac
+
+          ghcr_owner="${REPO_OWNER,,}"
+          ghcr_repo="ghcr.io/${ghcr_owner}/${IMAGE_NAME}"
+
+          trimmed_registry="${REGISTRY#"${REGISTRY%%[![:space:]]*}"}"
+          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
+          effective_registry="${trimmed_registry,,}"
+
+          trimmed_user="${REGISTRY_USER#"${REGISTRY_USER%%[![:space:]]*}"}"
+          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
+          effective_user="${trimmed_user,,}"
+
+          trimmed_login_user="${REGISTRY_LOGIN_USER#"${REGISTRY_LOGIN_USER%%[![:space:]]*}"}"
+          trimmed_login_user="${trimmed_login_user%"${trimmed_login_user##*[![:space:]]}"}"
+
+          if [[ -z "${effective_registry}" || "${effective_registry}" == "ghcr.io" ]]; then
+            use_secondary="false"
+            primary_registry="ghcr.io"
+            primary_user="${ghcr_owner}"
+            primary_login_user=""
+            secondary_repo=""
+            metadata_images="${ghcr_repo}"
+            buildx_outputs="type=image,name=${ghcr_repo},push=true,push-by-digest=true,name-canonical=true"
+          else
+            if [[ ! "${effective_registry}" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[0-9]{1,5})?$ ]]; then
+              echo "Invalid container registry hostname '${effective_registry}'." >&2
+              exit 1
+            fi
+
+            if [[ -z "${effective_user}" || ! "${effective_user}" =~ ^[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*(/[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*)*$ ]]; then
+              echo "CONTAINER_REGISTRY_USER is required and must be a valid OCI namespace when targeting '${effective_registry}'." >&2
+              exit 1
+            fi
+
+            effective_login_user="${trimmed_login_user:-${effective_user}}"
+            if [[ -z "${effective_login_user}" || "${effective_login_user}" =~ [[:space:][:cntrl:]] ]]; then
+              echo "CONTAINER_REGISTRY_LOGIN_USER must be a non-empty single-token login username without whitespace or control characters." >&2
+              exit 1
+            fi
+
+            if [[ "${REGISTRY_SECRET_PRESENT}" != "true" ]]; then
+              echo "CONTAINER_REGISTRY_PASSWORD secret is required when targeting external registry '${effective_registry}'." >&2
+              exit 1
+            fi
+
+            use_secondary="true"
+            primary_registry="${effective_registry}"
+            primary_user="${effective_user}"
+            primary_login_user="${effective_login_user}"
+            secondary_repo="${effective_registry}/${effective_user}/${IMAGE_NAME}"
+            metadata_images="$(printf '%s\n%s' "${secondary_repo}" "${ghcr_repo}")"
+            buildx_outputs="$(printf 'type=image,name=%s,push=true,push-by-digest=true,name-canonical=true\ntype=image,name=%s,push=true,push-by-digest=true,name-canonical=true' "${secondary_repo}" "${ghcr_repo}")"
+          fi
+
+          {
+            echo "use-secondary=${use_secondary}"
+            echo "primary-registry=${primary_registry}"
+            echo "primary-user=${primary_user}"
+            echo "primary-login-user=${primary_login_user}"
+            echo "ghcr-owner=${ghcr_owner}"
+            echo "ghcr-repository=${ghcr_repo}"
+            echo "secondary-repository=${secondary_repo}"
+            echo "metadata-images<<__ISLAMU_EOF__"
+            printf '%s\n' "${metadata_images}"
+            echo "__ISLAMU_EOF__"
+            echo "buildx-outputs<<__ISLAMU_EOF__"
+            printf '%s\n' "${buildx_outputs}"
+            echo "__ISLAMU_EOF__"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,12 +198,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Log in to ATcr
+      - name: Log in to external container registry
+        if: ${{ steps.validate.outputs.use-secondary == 'true' }}
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
-          registry: ${{ inputs.registry }}
-          username: ${{ inputs.registry-user }}
-          password: ${{ secrets.ATCR_PASSWORD }}
+          registry: ${{ steps.validate.outputs.primary-registry }}
+          username: ${{ steps.validate.outputs.primary-login-user }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
       - name: Log in to GHCR
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -82,17 +213,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Extract metadata
+      - name: Extract metadata (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: |
-            ${{ inputs.registry }}/${{ inputs.registry-user }}/${{ inputs.image-name }}
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}
+          images: ${{ steps.validate.outputs.metadata-images }}
           tags: ${{ inputs.metadata-tags }}
 
-      - name: Build and push
-        id: build
+      - name: Build and push (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
+        id: build-tagged
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ inputs.context }}
@@ -108,16 +239,64 @@ jobs:
           build-args: |
             BUILD_CONFIGURATION=${{ inputs.build-configuration }}
 
-      - name: Record image digest evidence
+      - name: Build and stage by digest only (no registry tags)
+        if: ${{ inputs.push-mode == 'digest-only' }}
+        id: build-digest
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          sbom: true
+          provenance: mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          outputs: ${{ steps.validate.outputs.buildx-outputs }}
+          build-args: |
+            BUILD_CONFIGURATION=${{ inputs.build-configuration }}
+
+      - name: Resolve canonical digest references
+        id: refs
+        shell: bash
+        env:
+          TAGGED_DIGEST: ${{ steps.build-tagged.outputs.digest }}
+          DIGEST_ONLY_DIGEST: ${{ steps.build-digest.outputs.digest }}
+          USE_SECONDARY: ${{ steps.validate.outputs.use-secondary }}
+          SECONDARY_REPOSITORY: ${{ steps.validate.outputs.secondary-repository }}
+          GHCR_REPOSITORY: ${{ steps.validate.outputs.ghcr-repository }}
+        run: |
+          set -euo pipefail
+          digest="${TAGGED_DIGEST:-${DIGEST_ONLY_DIGEST}}"
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Container build did not produce a valid sha256 OCI index digest: '${digest}'." >&2
+            exit 1
+          fi
+
+          ghcr_ref="${GHCR_REPOSITORY}@${digest}"
+          secondary_ref=""
+          if [[ "${USE_SECONDARY}" == "true" ]]; then
+            secondary_ref="${SECONDARY_REPOSITORY}@${digest}"
+          fi
+
+          {
+            echo "digest=${digest}"
+            echo "ghcr-reference=${ghcr_ref}"
+            echo "secondary-reference=${secondary_ref}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record image digest evidence (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
         shell: bash
         env:
           RestorePackagesWithLockFile: "false"
           IMAGE_NAME: ${{ inputs.image-name }}
           DOCKERFILE: ${{ inputs.dockerfile }}
           CONTEXT: ${{ inputs.context }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.refs.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
-          METADATA: ${{ steps.build.outputs.metadata }}
+          METADATA: ${{ steps.build-tagged.outputs.metadata }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/container
@@ -136,11 +315,75 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Record digest-only staging evidence
+        if: ${{ inputs.push-mode == 'digest-only' }}
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ inputs.image-name }}
+          DOCKERFILE: ${{ inputs.dockerfile }}
+          CONTEXT: ${{ inputs.context }}
+          DIGEST: ${{ steps.refs.outputs.digest }}
+          USE_SECONDARY: ${{ steps.validate.outputs.use-secondary }}
+          SECONDARY_REF: ${{ steps.refs.outputs.secondary-reference }}
+          GHCR_REF: ${{ steps.refs.outputs.ghcr-reference }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/container
+
+          if [[ "${USE_SECONDARY}" == "true" ]]; then
+            references_json="$(jq -n --arg secondary "${SECONDARY_REF}" --arg ghcr "${GHCR_REF}" '[$secondary, $ghcr] | sort')"
+            docker buildx imagetools inspect "${SECONDARY_REF}" | tee "artifacts/container/${IMAGE_NAME}-secondary-oci-inspect.txt"
+          else
+            references_json="$(jq -n --arg ghcr "${GHCR_REF}" '[$ghcr]')"
+          fi
+
+          jq -n \
+            --arg imageName "${IMAGE_NAME}" \
+            --arg dockerfile "${DOCKERFILE}" \
+            --arg context "${CONTEXT}" \
+            --arg pushMode "digest-only" \
+            --arg digest "${DIGEST}" \
+            --argjson references "${references_json}" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg ref "${GITHUB_REF}" \
+            --arg runId "${GITHUB_RUN_ID}" \
+            --arg runAttempt "${GITHUB_RUN_ATTEMPT}" \
+            '{
+              imageName: $imageName,
+              dockerfile: $dockerfile,
+              context: $context,
+              pushMode: $pushMode,
+              digest: $digest,
+              tags: [],
+              references: $references,
+              github: {
+                repository: $repository,
+                sha: $sha,
+                ref: $ref,
+                runId: $runId,
+                runAttempt: $runAttempt
+              }
+            }' | tee "artifacts/container/${IMAGE_NAME}-digest.json"
+
+          {
+            echo "## Container image digest-only staging"
+            echo
+            echo "Image: \`${IMAGE_NAME}\`"
+            echo
+            echo "Digest: \`${DIGEST}\`"
+            echo
+            echo "Canonical tagless references:"
+            jq -r '.references[] | "- `" + . + "`"' "artifacts/container/${IMAGE_NAME}-digest.json"
+            echo
+            echo "No mutable or version registry tags were assigned."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Export SBOM and provenance registry evidence
         shell: bash
         env:
           IMAGE_NAME: ${{ inputs.image-name }}
-          IMAGE_REF: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          IMAGE_REF: ${{ steps.refs.outputs.ghcr-reference }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/container
@@ -161,14 +404,15 @@ jobs:
             echo "These files preserve the registry manifest/index evidence for the Buildx SBOM and provenance attestations generated during the build."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Record immutable deployment tag promotion evidence
+      - name: Record immutable deployment tag promotion evidence (tagged mode)
+        if: ${{ inputs.push-mode == 'tagged' }}
         shell: bash
         env:
           RestorePackagesWithLockFile: "false"
           IMAGE_NAME: ${{ inputs.image-name }}
-          REGISTRY: ${{ inputs.registry }}
-          REGISTRY_USER: ${{ inputs.registry-user }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          REGISTRY: ${{ steps.validate.outputs.primary-registry }}
+          REGISTRY_USER: ${{ steps.validate.outputs.primary-user }}
+          DIGEST: ${{ steps.refs.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           set -euo pipefail
@@ -208,7 +452,7 @@ jobs:
       - name: Generate Trivy SARIF evidence
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ steps.refs.outputs.ghcr-reference }}
           format: sarif
           output: artifacts/container/${{ inputs.image-name }}-trivy.sarif
           exit-code: "0"
@@ -219,7 +463,7 @@ jobs:
       - name: Scan image vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ steps.refs.outputs.ghcr-reference }}
           format: table
           output: artifacts/container/${{ inputs.image-name }}-trivy.txt
           exit-code: "1"
@@ -230,8 +474,8 @@ jobs:
       - name: Generate GHCR artifact attestation
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-name: ${{ steps.validate.outputs.ghcr-repository }}
+          subject-digest: ${{ steps.refs.outputs.digest }}
           push-to-registry: true
 
       - name: Verify GHCR artifact attestation
@@ -239,7 +483,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           IMAGE_NAME: ${{ inputs.image-name }}
-          IMAGE_REF: ghcr.io/${{ github.repository_owner }}/${{ inputs.image-name }}@${{ steps.build.outputs.digest }}
+          IMAGE_REF: ${{ steps.refs.outputs.ghcr-reference }}
           SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/_container-build.yml
         run: |
           set -euo pipefail
@@ -285,6 +529,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: container-build-${{ inputs.image-name }}
+          overwrite: true
           path: artifacts/container/**
           if-no-files-found: warn
           retention-days: 90

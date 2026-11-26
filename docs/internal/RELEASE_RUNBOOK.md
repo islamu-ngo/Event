@@ -1,15 +1,17 @@
-<!-- ABOUTME: Provides the current manual release procedure and future governed-release operator flow. -->
-<!-- ABOUTME: Keeps operator approval explicit while defining trust, evidence, and recovery boundaries. -->
-
 # Release Runbook
 
-> **Status:** Current manual procedure active; governed flow is prospective
+> **Audience:** Platform/Ops | Release operators | Maintainers | AI agents
+> **Status:** Implemented at source level; production SSH signer enrollment and live release rehearsal require Project Steward approval
 > **Owner:** Platform/Ops and release operators
+> **Last Verified:** 2026-11-26
+> **Source Anchors:** `eng/release/`, `.github/workflows/release.yml`, `.github/workflows/_container-build.yml`, `.github/workflows/workflow-security.yml`, `docs/internal/RELEASE_POLICY.md`, `docs/internal/RELEASE_CHECKLIST.md`
+
+This runbook provides the day-to-day commit/fragment workflow, verified toolchain provisioning, signed release execution, failure recovery, and authorized live-rehearsal procedures for ISLAMU Event.
 
 ## Complete release-impact metadata
 
 Before the license audit, CI restores the conditional Standalone container graph
-and the moderation launcher, browser installer, migration scaffolder and shared
+and the moderation launcher, browser installer, migration scaffolder, and shared
 Keycloak tool owners without running their operations. It finishes with ordinary
 solution assets for the build. For a missing-metadata failure, verify package and
 version coverage for these profiles before changing policy or relying on a warm
@@ -22,52 +24,30 @@ A workflow correction on a PR branch does not replace the trusted-base version
 used by `pull_request_target`; arrange an independently reviewed base update
 before relying on its rerun.
 
-## Current procedure
+## Operational gates before tagging
 
-If CodeQL is cancelled, inspect the actual workflow conclusion and phase
-timestamps before interpreting the result. Follow
-[the operational procedure](OPERATIONS.md#codeql-analysis-cancellation)
-and retain a completed analysis for the candidate before satisfying its
-scanner gate. A successful traced build alone does not satisfy that gate.
-
-Until a trusted release bundle, release-engine verification, signer policy, provider
-protection evidence, and advisory dry run are implemented, operators MUST use
-[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The current process is manual SemVer
-tags and manually authored GitHub Releases. Do not invoke imagined release-engine
-commands, claim automatic approval, or create generated changelog writes on
-`develop`.
-
-Treat Codecov feedback as advisory shipped-product evidence. Check the commit
-and included suite flags before interpreting a percentage; never combine
-different commits or label missing runtime lanes as complete. If publication fails,
-follow [coverage publication operations](OPERATIONS.md#codecov-coverage-publication);
-do not substitute coverage percentages for the checklist's required tests.
-
-Prepare the owned browser through the existing native installer and its
-dedicated committed lock, preserving other tools' locks. Follow
-[security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution)
-when restore or download fails. Only actual case execution, not installation,
-can satisfy the browser portion of the candidate's assurance.
-
-For SDK/runtime servicing, verify the official release's CVE mapping and image
-digests, regenerate owned dependency locks with the selected SDK, and retain
-the affected build and deployment evidence. Follow
-[the servicing baseline](OPERATIONS.md#sdk-and-runtime-servicing) and
-[operator rebuild instructions](../public/documentation/readme/self-hosting/docker-standalone.md).
-Do not treat framework pruning or a Dockerfile static check as a completed
-application image rebuild or a deployed-runtime verification.
-
-Generate the existing durable evidence bundle only as the checklist directs:
-
-```sh
-dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-evidence
-```
+- **CodeQL:** if CodeQL is cancelled, inspect the actual workflow conclusion and phase
+  timestamps before interpreting the result. Follow
+  [the operational procedure](OPERATIONS.md#codeql-analysis-cancellation)
+  and retain a completed analysis for the candidate; a traced build alone does not satisfy the gate.
+- **Codecov:** treat Codecov feedback as advisory shipped-product evidence. Check commit and
+  included suite flags; never combine different commits or substitute coverage for required tests.
+  See [coverage publication operations](OPERATIONS.md#codecov-coverage-publication).
+- **Browser prerequisites:** prepare the owned browser through `eng/tools/InstallAssuranceBrowser.cs`
+  and its dedicated committed lock without disturbing shared tool locks. See
+  [security fixture prerequisites](CI_CD_GOVERNANCE.md#security-integration-fixture-execution).
+  Only actual case execution satisfies the browser portion of candidate assurance.
+- **SDK and `.NET 10` container parity:** verify the official SDK (`global.json` `10.0.404`) and
+  digest-pinned `.NET 10` base images across all four Dockerfiles (`Explore.API`, `Explore.Blazor`,
+  `Event.Standalone`, `Event.MigrationService`). Follow
+  [the servicing baseline](OPERATIONS.md#sdk-and-runtime-servicing) and
+  [operator rebuild instructions](../public/documentation/readme/self-hosting/docker-standalone.md).
 
 ## Native authority provisioning and recovery
 
 Native authorization and read paths require a database provisioned through the
 matching migrator/provisioning path. Disposable development databases can be recreated;
-do not hand-edit roles, grants, functions or RLS policies to imitate the expected
+do not hand-edit roles, grants, functions, or RLS policies to imitate the expected
 state.
 
 - **Category and lookup writes:** Runtime receives a narrow, attested DML contract
@@ -81,7 +61,7 @@ state.
   `instance_bootstrap_states` remains denied with PostgreSQL `42501`. Do not grant
   Runtime table access to work around an onboarding-status failure; verify the
   reader/Global pool configuration instead.
-- **Instance administration:** `/api/admin/instance/*`, instance onboarding and
+- **Instance administration:** `/api/admin/instance/*`, instance onboarding, and
   instance settings are installation-scoped and do not require `X-Tenant-Slug`.
   Do not add a synthetic default-tenant header or a controller-wide tenant
   exemption. Missing HAL actions should be diagnosed through instance authority
@@ -96,834 +76,175 @@ To return to an earlier candidate, provision fresh databases with that candidate
 migrator and re-run its native attestations before starting the matching binary.
 Never widen a runtime role to make an older binary start. See
 [native runtime qualification](testing/NATIVE_RUNTIME_QUALIFICATION.md) for fresh
-migration, actual-role readiness and original-operation recovery evidence.
+migration, actual-role readiness, and original-operation recovery evidence.
 
-## Future governed release flow
+## Verified `git-cliff` `2.14.2` toolchain
 
-1. Create public change metadata and its commit footer together:
+`eng/release/toolchain.lock.json` pins official `git-cliff` `2.14.2` archives and extracted executables across `linux-x64`, `linux-arm64`, `osx-arm64`, and `windows-x64`.
 
-   ```sh
-   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
+1. **Provision explicitly (sole network-capable command):**
+   ```bash
+   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- ensure-git-cliff
+   ```
+2. **Verify strictly offline:**
+   ```bash
+   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- verify-tools
+   ```
+
+All authoritative invocations (`prepare`, tests) verify executable SHA-256 and version locally and run with `--config`, `--offline`, `--no-exec`, and `GIT_CLIFF_OFFLINE=1` via argument arrays without a shell. Set `ISLAMU_RELEASE_TOOL_BUNDLE` or `ISLAMU_RELEASE_TOOL_CACHE` to customize local storage.
+
+## Day-to-day commit and optional fragment workflow
+
+1. Confirm `.githooks` is active (`git config --get core.hooksPath` → `.githooks`). `.githooks/commit-msg` is a thin wrapper around `preflight-commit`.
+2. Routine non-breaking internal commits (`test`, `refactor`, `style`, `build`, `ci`, `chore`, or engineering scopes such as `release`, `ci`, `documentation`, `testing`) omit automatically without `Changelog: skip` trailers.
+3. Breaking changes require both `!` in the header and a non-empty `BREAKING CHANGE:` footer and stay release-visible.
+4. For high-impact user/operator/API/migration/security changes requiring structured evidence, create an optional fragment under `docs/internal/releases/changes/`:
+   ```bash
+   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
      create-change --target develop --type <type> --scope <scope> \
      --title "<title>" --summary "<summary>"
    ```
-
-   Confirm `git config --get core.hooksPath` first. The tracked `.githooks`
-   message hook invokes native `preflight-commit`; enable it with
-   `git config core.hooksPath .githooks` if no custom chain is configured.
-   Install a managed chain with `install-change-hooks --target develop` when needed;
-   the installer resolves Git's active hook directory.
-   Existing hooks are preserved and chained. Immediately before merge or
-   conflict resolution, run:
-
-   ```sh
-   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-     preflight-range --target develop --head HEAD
+   `preflight-commit` and `preflight-range` validate every staged/referenced fragment with full `ReleaseInputPolicy.Validate`, rejecting `Public-Disclosure: embargoed` and `Restricted-Details` keys while allowing ordinary English prose.
+5. Before merging a feature branch, verify the bounded range:
+   ```bash
+   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
+     preflight-range --target origin/develop --head HEAD
    ```
 
-   If a committed feature footer collides, keep the commit immutable and run
-   `rename-change --commit <full-oid> --from <old-id> --reason "<reason>"`.
-   Review and commit the generated replacement fragment plus exact-commit
-   correction record, then rerun `preflight-range`. Do not amend, rebase, or
-   create a loose ID alias for this repair.
-2. Before the first governed release only, meaning no governed stable SemVer release
-   tag is reachable from the candidate, an operator may activate one explicit
-   `changelog-baseline-YYYY-MM-DD` lower-bound tag after Project Steward approval.
-   The tag is created outside the verifier as an SSH-signed annotated tag targeting
-   the eventual merged activation commit, then verified with exact full IDs:
+## Enrolling production SSH release signers (Project Steward gate)
 
-   ```sh
-   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-     verify-baseline changelog-baseline-YYYY-MM-DD <full-target-oid> <full-tag-object-id>
+`eng/release/trust/allowed-signers` is intentionally comment-only until the Project Steward approves production signer enrollment, so `verify-release-tag` and `.github/workflows/release.yml` fail closed (`tag_allowed_signers_empty`).
+
+When the Project Steward authorizes enrollment:
+
+1. Each authorized release operator generates a dedicated Ed25519 signing key on their own hardware/workstation and shares only the `.pub` file (private keys never enter Git, CI secrets, or chat):
+   ```bash
+   ssh-keygen -t ed25519 -C "islamu-release-operator"
    ```
+2. Add the reviewed principal line (`<principal> namespaces="git,islamu-release-checksums" ssh-ed25519 <base64-key>`) to `eng/release/trust/allowed-signers` (enabling domain-separated Git tag verification under `git` and post-tag `SHA256SUMS.sig` verification under `islamu-release-checksums`), record the rotation/enrollment in `eng/release/trust/rotation-history.md`, and merge through protected review.
+3. Configure the GitHub `release` environment (required reviewers, tag protection `v*` only), a GitHub **tag ruleset** restricting updates and deletions on `v*` (with reviewed minimal bypass actors), and optional container registry settings in GitHub Repository or Environment (`release` / `production` / `staging`) **Settings → Secrets and variables → Actions** (zero registry hosts or personal handles are hardcoded in workflow YAML):
 
-   The verifier writes `docs/internal/releases/baselines/changelog-baseline-YYYY-MM-DD.v1.json`.
-   It never creates, deletes, moves, signs, pushes, publishes, or fetches tags. If the
-   tag is lightweight, unsigned, unauthorized, recreated, moved, date-malformed,
-   target-mismatched, or supplied with a short object ID, stop and restart from a
-   reviewed operator action. Do not use `v0.0.0` or any fake SemVer tag as a baseline,
-   and do not treat the selected version number as proof that this is the first
-   governed release.
-3. An operator selects the version-line **label** `v<major>.<minor>` the release
-   belongs to and prepares only `release.yaml` and `summary.md`; public high-impact
-   facts are supplied through validated change fragments. The label classifies the
-   release; it never names a branch and nothing derives a ref from it.
-4. The trusted bundle validates complete Git objects, policy, range, version,
-   impacts, and public inputs. It normalizes context and calls the promoted
-   git-cliff renderer with the `VerifiedTrustedBundle` capability returned by
-   successful bundle verification. Candidate jobs never pass raw config, lock,
-   executable, or digest inputs into rendering. The renderer passes
-   `--config <trusted>`, `--from-context <context>`, `--offline`, and `--no-exec`
-   from an isolated non-Git working directory after rechecking bundle-owned bytes.
-5. The preparation command generates `release-notes.md` and creates the reviewed
-   preparation commit `B`. The message explicitly explains its release-metadata
-   changelog skip so the generated note does not include itself.
-6. The authoritative bundle verifies candidate `B` and emits deterministic
-   pre-tag candidate evidence from immutable objects only. Integrating `B` into the
-   branch it was prepared on is a fast-forward-only compare-and-swap; that
-   compare-and-swap is a precondition of the *push*, not part of verification. Any
-   replacement of `B` requires regeneration and review because it is a new object.
-7. An authorized release operator creates an SSH-signed annotated tag targeting
-   exactly `B`. Tag verification records signer, tag object ID, candidate digest,
-   policy/tool hashes, and note/context hashes in final evidence.
-8. For the newest stable release only, protected `main` advances by normal
-   fast-forward to exactly `B`. Prereleases and older-line patches do not move
-   `main` backwards.
-9. The provider adapter retains artifacts and may publish a derived enriched view,
-   but it cannot alter authoritative notes, identity, or approval.
+   | Setting | Kind | Required | Purpose |
+   |---|---|---|---|
+   | `CONTAINER_REGISTRY` | Variable (`vars`) | Optional | External OCI registry host (e.g., `docker.io`, `quay.io`, `atcr.io`). Leave unset or set `ghcr.io` for **GHCR-only** releases (`4` canonical digest references; namespace always resolves to lowercase `github.repository_owner`). |
+   | `CONTAINER_REGISTRY_USER` | Variable (`vars`) | When `CONTAINER_REGISTRY` is non-GHCR | OCI repository namespace (e.g., Docker Hub org/user or Quay namespace; supports OCI separators `.`, `_`, `__`, `-+`). Ignored in GHCR-only mode. |
+   | `CONTAINER_REGISTRY_LOGIN_USER` | Variable (`vars`) | Optional | Login username for the external registry when it differs from the OCI namespace (for example a Quay robot `org+deploy` or a personal Docker Hub username pushing to a Docker Hub org). Defaults to `CONTAINER_REGISTRY_USER` when unset. |
+   | `CONTAINER_REGISTRY_PASSWORD` | Secret (`secrets`) | When `CONTAINER_REGISTRY` is non-GHCR | Registry password or token for the external OCI registry. Unused in GHCR-only mode (uses built-in `GITHUB_TOKEN`). |
 
-### Provider adapter planning
+   **Coolify registry cutover check:** Coolify webhooks (`deploy-coolify.yml` / `deploy-coolify-develop.yml`) are bearer-authenticated `GET` triggers that neither set nor verify the deployed container image reference or digest. Before the first staging or production deployment after changing `CONTAINER_REGISTRY` (for example cutting over from ATCR to GHCR-only, or later to Docker Hub), update the Coolify API and UI resource image repositories and pull credentials to match `<registry>/<namespace>/islamu-event-{api,ui}`, and verify in Coolify after deployment that the running container digest equals `Expected image digest` from the deployment summary.
 
-Before a forge-specific adapter transports retained artifacts or protected-ref inputs,
-validate the provider definitions and write transport plans from explicit local release
-inputs:
+## Executing a governed release
 
-```sh
-dotnet run .ci/scripts/validate-release-provider-adapters.cs -- \
-  --providers .ci/providers \
-  --inputs /absolute/path/release-adapter-inputs.v1.json \
-  --bundle-root /absolute/path/promoted-bundle-root \
-  --output /absolute/path/release-adapter-plans
-```
+### Step 1 — Preview conservative contract diff locally
 
-The input file supplies `release-adapter-inputs.v1`, full target/tag/protected-ref
-object IDs, the promoted bundle relative path, expected bundle SHA-256, artifact
-manifest SHA-256, tag name, and dirty-worktree status. The validator rejects path
-aliases, short object IDs, checksum drift, preview secrets, final candidate-code
-authority, preview write/OIDC permissions, mutable GitHub Actions pins, missing
-required checks, provider/action misrepresentation, symlink/reparse/hardlink aliases,
-and metadata-authoritative plans before publishing output.
-
-For a provider action whose capability is unsupported, pass separate external control
-evidence only after an operator has recorded the provider-side control:
-
-```sh
-dotnet run .ci/scripts/validate-release-provider-adapters.cs -- \
-  --providers .ci/providers \
-  --provider tangled \
-  --operation publish-release \
-  --external-control-evidence /absolute/path/external-control-evidence.v1.json \
-  --inputs /absolute/path/release-adapter-inputs.v1.json \
-  --bundle-root /absolute/path/promoted-bundle-root \
-  --output /absolute/path/release-adapter-plans
-```
-
-The provider manifest cannot provide this evidence itself. The evidence file is bounded
-and must exactly match `providerId`, `operation`, and the unsupported capability.
-
-Successful output is bounded:
-
-```text
-adapter_validation_passed: providers=<count>
-```
-
-The resulting `*.transport-plan.v1.json` files are provider transport instructions
-only. They preserve checksum equality across Forgejo/Codeberg, Tangled, and GitHub;
-they do not render notes, sign tags, classify commits, choose versions, publish
-releases, or update protected refs by themselves.
-
-## Required controls before activation
-
-### Preparation command
-
-After `docs/internal/releases/<version>/release.yaml` and `summary.md` are reviewed, check out
-the commit the release should end at and run the command from that working tree. The
-range end is the checked-out `HEAD`; no branch name is derived from the line label.
-
-```sh
-dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  prepare docs/internal/releases/<version>
-```
-
-The protected environment supplies the promoted bundle, receipt, detached
-signature, principal, expected manifest SHA-256, and expected bundle, policy,
-config, and trust versions through `ISLAMU_RELEASE_TRUSTED_BUNDLE`,
-`ISLAMU_RELEASE_PROMOTION_RECEIPT`, `ISLAMU_RELEASE_PROMOTION_SIGNATURE`,
-`ISLAMU_RELEASE_PROMOTION_PRINCIPAL`, `ISLAMU_RELEASE_MANIFEST_SHA256`,
-`ISLAMU_RELEASE_BUNDLE_ID`, `ISLAMU_RELEASE_BUNDLE_VERSION`,
-`ISLAMU_RELEASE_POLICY_VERSION`, `ISLAMU_RELEASE_CONFIG_VERSION`, and
-`ISLAMU_RELEASE_TRUST_VERSION`.
-The command verifies that promotion before rendering, reads the descriptor and
-summary, derives the complete local Git range from `Previous-Published-Tag` to the
-checked-out `HEAD`, validates linked public fragments and impact evidence,
-atomically creates `release-notes.md`, and writes authoritative
-`release-context.v1.json` next to the release inputs. The generated notes always
-use this order: maintainer summary, release-visible details only, then complete
-provider-neutral full commit range. Empty detail/impact sections are omitted.
-It prints the exact `docs(release): prepare <version>` commit message with
-`Changelog: skip` and `Changelog-Reason: release metadata commit`; it never
-commits, tags, pushes, publishes, invokes candidate code, or uses the network.
-An identical rerun is a byte-idempotent success. A different existing generated
-file, path escape, symbolic link, context/range/fragment drift, renderer failure,
-or write failure stops without changing `release.yaml` or `summary.md`.
-
-### Generated-note mismatch recovery
-
-Promote the updated engine and packaged template together; replacing a file
-inside an accepted bundle is not promotion. A formatter change can change
-authoritative Markdown bytes even when its governed release context is identical.
-
-Before committing `B`, preserve reviewed hand-authored `release.yaml` and
-`summary.md`, remove only the uncommitted generated `release-context.v1.json`
-and `release-notes.md` for that version, then rerun preparation with the intended
-promoted bundle. Review the complete regenerated pair before committing.
-Do not bypass differing-file guards, edit generated notes by hand, or remove
-unrelated files. After signing, preserve the historical bytes and correct
-forward through the release addendum/correction procedure.
-
-Candidate verification at exact `B` recomposes the notes and rejects a committed
-difference with `candidate_release_notes_mismatch`; a clean worktree does not
-exempt notes from that check.
-
-### Categorized notes and formatter verification
-
-The notes retain the maintainer summary, categorized primary entries, applicable
-impact evidence, and complete technical range. Categories are Breaking Changes,
-Features, Bug Fixes, Performance, and Other Improvements, in that order, with
-empty categories omitted. Breaking status takes precedence over commit type,
-so a breaking fix appears once under Breaking Changes. Context order within each
-category and release/backport identity remain unchanged. Evidence and
-complete-range references may repeat IDs without repeating the primary entry.
-
-Follow the [explicit renderer checks](../../eng/release/README.md#tests) before
-promoting a formatter change. The tool-bundle variable alone does not select
-TUnit `[Explicit]` methods. Verify both archive and executable against the
-committed lock, retain upstream license notices, and run all exact selectors
-with `--minimum-expected-tests 1`.
-
-These fixtures use real locked renderer bytes with synthetic promotion receipts,
-SSH trust, and dummy engine bundle bytes. Passing them is not production signer
-or bootstrap approval. Applicable breaking, migration, configuration, security,
-OpenAPI, and operator evidence still belongs in the release descriptor and
-fragments; category headings cannot replace it.
-
-### Candidate verification command
-
-After the reviewed preparation commit `B` is created, run the promoted bundle verifier
-against that exact full commit object. No branch has to point at `B`, and the command
-works identically in a clone that fetched only `refs/tags/*` when its retained
-execution sidecar and referenced reports have also been supplied:
-
-1. Retrieve `security-test-evidence` from successful selected execution of both
-   required lanes at **exact B**. A PR merge SHA or unrelated no-op is not B's
-   evidence.
-2. Copy `security-execution.v1.json` and its referenced artifact paths into
-   `docs/internal/releases/<version>/`, preserving the uploaded relative layout.
-   These are post-commit inputs; do not create a circular B identity by committing
-   the sidecar into B.
-3. Keep these exact bytes for replay and tag-only clones. Missing, stale,
-   duplicated, skipped, zero-test or digest-inconsistent evidence rejects
-   candidate verification before a manifest is written.
-
-When acquisition fails before child launch, distinguish the selected daemon's
-read-only transport result from workload and cleanup evidence. Do not use
-diagnostic socket-completion or global tracing overrides to qualify the final
-candidate; the dedicated handler's context isolation must work normally.
-
-For a stat-role link rejection, retain the security workflow's system-stat
-observation before choosing a repair. Confirm the actual link chain, executable
-and invocation semantics; a resolved multicall target may not accept stat's
-arguments directly. Preserve non-link candidate admission and bind any future
-utility selection to both measured and executed inputs. Do not retry with a link
-exception or assume that changing runner images proves compatibility.
-
-The native stat repair resolves only the fixed system entry and retains its
-same-basename executable for capture and both metadata operations. Unsupported
-dispatchers and linked entry/target ancestors fail closed. Verify real alias
-execution and unchanged managed/policy linked-input refusals before publication;
-the hosted workflow must still complete all registered profiles on the final head.
-Capture the fixed `stat_tool_*` rejection code when selection fails.
-`stat_tool_selection_unavailable` identifies an inaccessible or missing
-filesystem target without exposing its path or underlying exception text.
-
-For a discovery identity mismatch, retain native JSON and a real TRX from the
-required witness. The supported constructor display form maps to the undecorated
-CLR class through one shared parser used by admission and proof generation.
-Do not rewrite authority inventories to display text or relax exact/subset joins.
-
-Establish actual engine readiness with a separate bounded read-only uncached
-inventory request on the selected socket. Desktop proxy cache responses can
-precede VM startup; retain startup/readiness evidence separately. Preserve the
-asynchronous client's five-second request and three-second connection allowances.
-A lost mutation response is an unknown outcome: inspect the qualified resource
-and preserve the error instead of adding retries or declaring cleanup complete.
-
-```sh
-dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-candidate docs/internal/releases/<version> <full-B-oid>
-```
-
-The command reads the same protected environment variables as `prepare`. It validates
-the local repository without lazy fetches or replacement objects, resolves the base and
-previous tags as annotated tag objects, requires `B` to descend from the base tag along
-a linear range, requires `B` to be the terminal commit in the descriptor-selected range,
-and requires `B`'s terminal footers to be exactly
-`Changelog: skip` and `Changelog-Reason: release metadata commit`. It recomputes the
-release context through `B`, rerenders the notes with the separately promoted trusted
-bundle, and compares both committed generated artifacts byte-for-byte. It then writes
-or verifies `docs/internal/releases/<version>/release-candidate.v1.json`.
-
-It also validates the fixed security execution sidecar against actual TRX counts
-and artifact digests, then records `securityExecutionSha256`. Changing packet
-bytes invalidates an existing manifest. See [Security Verification](SECURITY_VERIFICATION.md)
-for protocol limits and the full provider/operational/provenance admission work
-that this initial gate does not certify.
-
-`release-candidate.v1.json` is pre-tag evidence only. It records schema/object format,
-full `B` and range commit IDs, version/line-label/date, base and previous tag commit
-IDs, the exact parent as `expectedIntegrationOldOid` and `B` as
-`expectedIntegrationNewOid` for the integration push precondition, trusted
-bundle/policy/config/trust/tool hashes, and release descriptor, fragment, summary,
-context, and note hashes. It deliberately omits every branch ref and branch head object
-ID, tag object IDs, current time, provider metadata, identities, emails, raw commit
-bodies, tokens, and secrets.
-
-Successful output is one bounded line:
-
-```text
-release_candidate_verified: docs/internal/releases/<version>/release-candidate.v1.json
-```
-
-Failures are also bounded and use stable diagnostic codes, for example:
-
-```text
-verify_candidate_failed: candidate_committed_artifact_mismatch
-verify_candidate_failed: candidate_object_anchors_moved
-verify_candidate_failed: candidate_terminal_commit_not_release_metadata_skip
-verify_candidate_failed: candidate_release_context_mismatch
-verify_candidate_failed: candidate_release_notes_mismatch
-verify_candidate_failed: candidate_manifest_stale
-```
-
-Base or previous tag recreation, squash/rebase/merge replacement, wrong parent/range,
-descriptor, fragment, policy, config, tool, bundle, context, summary, or note drift,
-shallow/partial/replace/graft state, object-format mismatch, stale candidate manifest,
-or dirty committed generated artifact stops before tagging or publication.
-
-### Tag message and final tag verification commands
-
-After `verify-candidate` succeeds, generate the annotated-tag message from authoritative
-release sources. Operators do not edit the tag narrative independently:
-
-```sh
-dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  tag-message docs/internal/releases/<version> > /tmp/islamu-release-tag-message.txt
-```
-
-The message contains only the authoritative tag name, version, release line, exact
-candidate `B`, candidate-manifest SHA-256, and release-note SHA-256. It has no
-independently editable summary or final-manifest digest and omits current time,
-provider UI state, identities, emails, raw commit bodies, tokens, and secrets.
-
-An authorized operator then creates the SSH-signed annotated tag outside the verifier:
-
-```sh
-git -c gpg.format=ssh -c user.signingKey=/path/to/release-signing-key \
-  tag -s v<version> <full-B-oid> -F /tmp/islamu-release-tag-message.txt
-```
-
-Verify the named tag locally; the command resolves and records its full tag object ID:
-
-```sh
-dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-tag docs/internal/releases/<version> v<version>
-```
-
-The promoted verifier retains the internal exact-object seam for prior published tag
-object drift checks; the public command accepts no caller-selected trust root or
-object override. `verify-tag` verifies the tag object is an
-annotated tag, the OpenSSH signature validates against the promoted allowed-signers
-root, the promoted signing policy authorizes the release role/principal/algorithm/date,
-the tag's internal name is exactly `v<version>`, the target is exactly `B`, the release
-line and descriptor fields still match, the candidate manifest digest and source-file
-hashes still match, and the existing `release-evidence.v1.json` is byte-identical on
-rerun. It writes or verifies:
-
-```text
-docs/internal/releases/<version>/release-evidence.v1.json
-```
-
-Successful output is one bounded line:
-
-```text
-release_tag_verified: docs/internal/releases/<version>/release-evidence.v1.json
-```
-
-Stable failure diagnostics include:
-
-```text
-verify_tag_failed: release_tag_not_annotated
-verify_tag_failed: release_tag_signature_invalid
-verify_tag_failed: release_signer_unauthorized
-verify_tag_failed: release_signer_revoked
-verify_tag_failed: release_signer_not_current
-verify_tag_failed: release_signer_algorithm_forbidden
-verify_tag_failed: release_tag_wrong_target
-verify_tag_failed: release_tag_name_mismatch
-verify_tag_failed: release_tag_message_mismatch
-verify_tag_failed: release_candidate_manifest_drift
-verify_tag_failed: release_notes_hash_mismatch
-verify_tag_failed: release_evidence_manifest_stale
-```
-
-Do not delete, recreate, or move tags to repair a failure. Correct the source of drift,
-discard stale candidate/final evidence, and repeat the governed candidate and tag flow.
-
-### Stable main verification command
-
-After final tag verification succeeds, resolve the full old `origin/main` commit and the
-final tag object ID locally, then verify the protected-ref action before any provider
-adapter updates `main`:
-
-```sh
-old_main_oid=$(git rev-parse --verify refs/remotes/origin/main^{commit})
-tag_object_id=$(git rev-parse --verify refs/tags/v<version>^{object})
-dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-main docs/internal/releases/<version> "$old_main_oid" "$tag_object_id"
-```
-
-The command reads only local Git objects, refs, and `release-evidence.v1.json`. It never
-fetches, pushes, signs, tags, commits, updates refs, executes candidate code, or calls a
-forge API. Every successful stable action requires `refs/remotes/origin/main` to still
-equal the supplied old full OID. Newest stable moves also require the final evidence
-target `B` to be a normal fast-forward descendant. If `main` is already at `B`, the
-command is idempotent. Older stable-line patches may publish but emit `no-main-move`;
-prereleases never advance `main`.
-
-Successful output is one bounded line with exact object IDs and a runbook action:
-
-```text
-release_main_verified: action=move-main old=<old-main-oid> new=<full-B-oid> tag=v<version> instruction=update-main-fast-forward
-release_main_verified: action=already-at-target old=<full-B-oid> new=<full-B-oid> tag=v<version> instruction=no-op-main-already-at-release
-release_main_verified: action=no-main-move old=<old-main-oid> new=<full-B-oid> tag=v<older-version> instruction=publish-release-without-main-update
-```
-
-Stable failure diagnostics include:
-
-```text
-verify_main_failed: release_main_oid_not_full
-verify_main_failed: release_main_expected_old_missing
-verify_main_failed: release_main_cas_mismatch
-verify_main_failed: release_main_non_fast_forward
-verify_main_failed: release_main_tag_object_mismatch
-verify_main_failed: release_main_evidence_target_mismatch
-verify_main_failed: release_main_prerelease_no_move
-```
-
-The provider adapter, not `verify-main`, performs the protected compare-and-swap update
-after this local proof. On any failure, discard the protected-ref action and repeat the
-candidate/tag/main verification from current local objects.
-
-- The authoritative job MUST download and verify a separately promoted bundle before
-  processing candidate data. An operator/provider supplies an immutable authoritative
-  promotion receipt and detached SSH signature separately from both the bundle and
-  candidate checkout. The previously promoted verifier resolves its promoter trust
-  root from its own fixed protected application directory, never from a request,
-  candidate path, current working directory, or bundle under verification. The signed
-  receipt binds the manifest, bundle, policy, config, and trust digests and versions;
-  reusing it for the same immutable bundle is idempotent, while using it for any
-  different bundle fails. No caller assertion or candidate checkout copy is
-  authoritative. Candidate jobs MUST have no signing, publication, deployment,
-  registry-write, OIDC, or protected-ref credentials.
-- The bundle MUST include the release engine, policy, renderer config, tool pin, and
-  SSH signer roots. The provider MUST retain protected-ref and environment approval
-  evidence for final operations.
-- `B`, the candidate record, the tag target, the committed notes, and the stable
-  `main` target MUST be checked as one exact full-object identity. No branch head takes
-  part in that identity; a branch head appears only as a push precondition.
-- Public release artifact MUST be deterministic and provider-neutral. Capture
-  required hashes and inputs without wall-clock, provider, author, raw-body, or token
-  data.
-- Restricted security inputs MUST remain in the embargo lane outside the public
-  checkout. If disclosure is not authorized, stop before public generation or tag.
-
-### Governed changelog publication and activation
-
-**Prospective / operator evidence required.** The approved
-[publication workstream](../../dev/backlog/governed-changelog-publication.md)
-adds an offline `sync-public-changelog` projection followed by protected
-transport. Neither checked-in workflow/configuration nor local tests attest live
-branch settings or GitBook delivery.
-
-The flow is final tag verification -> retained human authorization inventory ->
-offline all-line projection -> reviewed proposal -> protected acceptance ->
-mutable mirror -> observed GitBook delivery. The engine verifies/composes local
-inputs; the adapter owns network credentials, ref mutation and receipts. The
-publisher cannot grant disclosure authorization. Keep adopter help in the
-[public guide](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md),
-not in the entries-only `docs/public/changelog/README.md`.
-
-#### Retain and verify inputs before dispatch
-
-Retain the complete set of finally verified, human-authorized releases before
-dispatch, including releases not yet on the accepted page. Pin full annotated
-tag-object IDs and retain disclosure authorization, final
-`release-evidence.v1.json`, authoritative bundles and notes hashes beyond expiring
-CI artifacts. Do not discover authority from directories on one branch or from
-the triggering version. Historical final evidence may be in retained storage,
-not at preparation commit `B`.
-
-The retained `authorized-inventory.v1` document must be signed as exact UTF-8
-bytes with the SSH namespace `islamu-publication`, the
-`publication-approver` principal and a matching sibling `.sig` file. The
-promoted trusted bundle must contain the approved public signer list at
-`trust/publication-allowed-signers`; a publisher-supplied key is never trusted.
-Each authorized inventory entry binds a retained
-`publication-approvals/<version>.json` receipt (`publication-approval.v1`) by
-SHA-256. That receipt binds version, full tag-object ID, final evidence SHA-256
-and `disclosureAuthorized: true`. Signing the complete inventory attests
-completeness and those individual disclosure decisions.
-
-The final operator prepares a new unsigned proposal with
-`prepare-publication-inventory`. Supply `--inventory` for the complete retained
-inventory, `--retained-evidence` for its artifact root, `--release-evidence`
-for the new final evidence path relative to that root, `--release-directory`
-for the committed release directory, `--disclosure-approved` with the exact
-version being approved, and `--output-directory` for a new proposal directory.
-The command re-verifies signed releases, retains every existing entry and
-approval, and reports `publication_inventory_pending_signature`. It never
-signs or replaces an accepted inventory.
-
-Review the complete proposal and sign its `authorized-inventory.v1.json` with
-the authorized operator key using `ssh-keygen -Y sign -n islamu-publication`.
-Retain the proposal, detached signature, approval receipts and final evidence
-through the protected final-lane change process before dispatching publication.
-The signature is a human authorization step, not a publisher-generated key.
-Initialize the first empty inventory explicitly during the reviewed trust
-bootstrap; an empty inventory is not publishable.
-
-Verification permits up to 1,024 retained entries, with a ten-second per-entry
-ceiling inside a five-minute complete-inventory deadline. The independently
-launched command is capped at six minutes. The publication job allows
-45 minutes for up to three fresh-snapshot attempts, each generating and
-checking the complete projection, plus bounded transport retries. Cancellation
-still propagates through signature verification, Git processes and file reads;
-larger inventories do not receive unbounded execution time.
-
-Use the independently promoted bundle to verify every pinned tag and retained
-evidence. Rebuild from the complete inventory and last accepted manifest;
-previously accepted identities cannot disappear. Missing authorization/evidence,
-moved or deleted tags, or tag-object/hash mismatches fail closed without a
-partial page. Verify projection bytes read-only before proposing acceptance.
-Identical inputs must produce identical output and no duplicate proposal.
-
-Install the independently reviewed launcher and its fixed promotion signer root
-on a dedicated protected `release-publication` runner, outside both the
-documentation checkout and promoted bundle. Never build the privileged runtime
-from the checkout being published. `run-promoted` verifies the signed promotion,
-stages only authenticated runtime files in a private separate directory, copies
-the independent promotion root, executes the promoted engine and removes the
-stage. Candidate code, caller-selected signer roots and inherited .NET runtime
-injection settings cannot select the verifier.
-
-With the promoted bundle and existing `ISLAMU_RELEASE_*` verification variables
-configured in the protected final lane, invoke that installed launcher from the
-accepted documentation checkout:
+Run `diff-contracts` between the pinned previous release OID (or signed baseline OID) and the candidate `HEAD` OID:
 
 ```bash
-"$RELEASE_TRUSTED_LAUNCHER" run-promoted sync-public-changelog \
-  --inventory /retained/authorized-inventory.v1.json \
-  --retained-evidence /retained \
-  --publication-base https://github.com/ISLAMU/Event/blob/ --check
+base_oid="$(git rev-parse <previous-tag>^{commit})"
+head_oid="$(git rev-parse HEAD^{commit})"
+dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
+  diff-contracts "$base_oid" "$head_oid" /tmp/contract-diff-preview.json
 ```
 
-Omit `--check` only when writing a reviewed proposal. The command updates the
-fixed `docs/public/changelog/README.md` and
-`docs/public/changelog/publication-manifest.v1.json`; it takes no output path.
-The manifest binds input-set and projection SHA-256, accepted identities and
-highest stable version. Missing bundle, signature, approval receipt, tag or
-accepted-history entry stops before any write.
+Review every `breaking` and `review_required` entry across OpenAPI/HAL, configuration contracts (`.env.example` secret/default values remain redacted), and discovered EF Core migration inventories. Validate migration semantics with real provider apply/idempotency tests and EF Core pending-model checks rather than treating the migration ledger as parity proof.
 
-The projection includes stable and authorized pre-release entries across
-maintenance/mainline, ordered by descriptor date descending, parsed SemVer
-precedence descending, then ordinal version. Keep pre-releases after stable
-publication; latest dated entry is not highest stable version or support policy.
-Breaking/upgrade actions precede ordinary categories. Entries expose durable
-immutable references and authoritative-notes hashes without contributor identity
-or restricted prose. The 1 MiB UTF-8 page budget includes metadata and sentinels;
-exceeding it must fail, not truncate, split history or silently raise the cap.
+### Step 2 — Commit human-owned release inputs only
 
-#### Establish protected acceptance and mirror separation
+Create and review ONLY the two human-owned files under `docs/internal/releases/<version>/`:
 
-1. Obtain operator approval and retain actual settings evidence for
-   `docs/publication`, holding the full existing `docs/public` tree. Require
-   independent review and checks; neither GitBook nor the publisher may bypass
-   acceptance protections. Exclude docs-only writes from deployment triggers.
-   Provision `docs/publication-receipts` separately for durable authenticated
-   append-only receipt history; prohibit deletion and history rewriting.
-2. Establish `docs/gitbook-sync` as the mutable publication mirror, with any
-   approved app bypass restricted to that ref. No automatic reverse merge into
-   acceptance, `develop`, candidate branches or stable `main` is permitted.
-3. Confirm live GitBook repository/ref, Project directory `docs/public`, initial
-   Git-to-GitBook direction, every section/space mapping and assets. Preserve
-   existing keys, especially Changelog `space-4`. Review a full-tree preview
-   before switching site-wide sync; record actual preview URLs only.
-4. Prove required checks execute on proposals from the selected bot identity.
-   A `GITHUB_TOKEN`-created event may not trigger downstream checks. Missing
-   checks leave publication pending until the reviewed credential/event or
-   explicit validation remedy executes them; never bypass protection.
-   Dispatch `validate` with the exact proposal PR number and full reviewed head
-   OID. Require its exact-head publication validation status on acceptance.
-   Dispatch `reconcile` only for that same accepted proposal/head; it rechecks
-   inventory freshness before mirror transport.
-5. Observe mirror and live site delivery for the accepted commit/digest.
-   Check routes, version anchors, callouts and desktop/mobile rendering at the
-   1 MiB bound. Safe contributor previews remain unprivileged and secret-free.
+- `docs/internal/releases/<version>/release.yaml` (selected version, release line `v<major>.<minor>`, fixed release date, `Base-Stable-Tag`, `Previous-Published-Tag`, full base/previous OIDs, compatibility, and six impact dispositions).
+- `docs/internal/releases/<version>/summary.md` (concise maintainer-owned summary, UTF-8 LF, no Markdown headings or raw HTML).
 
-#### Approval, concurrency and receipts
+Do **not** commit pre-generated `release-notes.md`, `release-context.v1.json`, `release-rendering-context.v1.json`, or `contract-diff.v1.json` before tagging. `.github/workflows/release.yml` runs `prepare ... --image-manifest` after container staging so published release notes bind to real built image digests.
 
-Use one global publication concurrency group with no in-progress cancellation,
-plus expected-old-commit compare-and-swap for mutations. Serialization does not
-replace complete-inventory reconciliation. A stale proposal must be recomputed
-against the observed accepted head; retry at most three times before reporting
-pending/failure. A changed union/digest requires a new review, not stale approval.
-Reuse the proposal for the same pinned tag set and projection digest.
+For the first governed release only (when no stable SemVer tag is reachable), create and verify one signed annotated `changelog-baseline-YYYY-MM-DD` tag targeting the baseline commit using `verify-release-tag`.
 
-Transport retries are distinct from stale-head CAS retries. Transient network
-and server failures use bounded backoff; rate-limit responses honor
-`Retry-After` within the bounded wait budget. Authentication, permission,
-disclosure and integrity failures stop immediately. After merge, reconciliation
-uses the exact retained PR head ref and accepted objects, so automatic deletion
-of the disposable proposal branch does not destroy recovery evidence.
+### Step 3 — Create and verify the SSH-signed annotated tag
 
-Retain the publication manifest, input-set/projection digests, expected/actual
-acceptance and mirror commits, attempt, bounded diagnostic and receipts outside
-expiring CI artifacts. The `publication-receipt.v1` states are `verified`,
-`pending`, `delivered` and `drift`. Transport or verification failures retain
-the `pending` state with a bounded `reason`; there is no separate `failed` state.
-Acceptance or mirror push alone is not delivery; delivery requires observation
-of the actual GitBook content. Receipts are non-authoritative publication
-metadata and contain no credentials, contributor identity or restricted prose.
+```bash
+target_oid="$(git rev-parse HEAD^{commit})"
+git -c gpg.format=ssh -c user.signingKey=/path/to/release-signing-key \
+  tag -s "v<version>" "$target_oid" -m "Release v<version>"
 
-#### Reconciliation, rotation and recovery
-
-| Incident | Required response |
-| --- | --- |
-| Dispatch coalesced, absent or interrupted | Reconcile the complete retained inventory with accepted state, including every unpublished authorized release. |
-| Crash before acceptance | Inspect the acceptance ref before retry; reuse verified inputs and avoid duplicate proposals. |
-| Crash after acceptance but before receipt | Recover accepted commit/digests, compare mirror/site and record observed outcome without regenerating release identity. |
-| Mirror write-back or manual page mutation | Preserve drift evidence before repair; compare protected accepted digest, obtain explicit reviewed correction, and never reverse-merge or silently overwrite. |
-| Missing inventory, evidence mismatch, moved/deleted tag | Quarantine the proposal; restore independently verifiable inputs, never substitute a current tag or omit an accepted entry. |
-| Outage, revoked token, wrong branch or missing bot checks | Record bounded pending/failed diagnostics, repair settings or validation path, then reconcile without broader-permission fallback. |
-
-For credential rotation, pause publication writes, revoke the old transport
-credential in its approved authority, privately install the least-privilege
-replacement, verify ref scopes and bot check execution, and reconcile. Git Sync
-is the transport; no new forge/GitBook content API token is required. A trusted
-publisher upgrade requires independent bundle promotion, checksum verification
-and reviewed projection differences, never in-place mutation of a promoted
-bundle.
-
-For disable/recovery, suspend dispatch and mirror writes, preserve inventory,
-bundles, accepted manifests and receipts, and revoke the credential when needed.
-Resume only after settings/approval and verification are restored. Publication
-repair never retags, rebuilds binaries, moves stable `main`, changes notes at
-`B`, or invalidates a signed release. Corrections to signed release content use
-forward release correction; a dated public clarification remains visibly
-non-authoritative.
-
-### Publication projection and drift reporting
-
-Publishing to a forge release page is a derived, non-authoritative view of the signed tag. Authoritative
-truth stays the tag object plus `release-notes.md` committed at `B`. A release is complete without
-any published page.
-
-Each published page MUST carry the authoritative `release-notes.md` SHA-256 and its tag reference, and
-MUST attach `release-evidence.v1.json`, `artifacts.sha256`, container image digests, and SBOM.
-Those assets are self-verifying; forge-generated source archives may be linked but are never
-treated as reproducible artifacts.
-
-To report drift between what is published and what was signed:
-
-```sh
-dotnet run --file .ci/scripts/report-publication-drift.cs -- \
-  --release-directory docs/internal/releases/<version> \
-  --projections publication-projection.v1.json \
-  --output publication-drift
+dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
+  verify-release-tag --tag "v<version>" --target "$target_oid"
 ```
 
-The projection input is a bounded `release-publication-projection.v1` document that the operator or
-adapter assembles from what each forge currently shows. For each provider it records `state`
-(`published`, `unavailable`, or `unsupported`), the `declaredReleaseNotesSha256`, the
-`declaredTagRef`, the attached `assets`, and either the `publishedBody` or its
-`publishedBodySha256`.
+Push the verified tag (`git push origin "v<version>"`). Pushing a matching SemVer tag triggers `.github/workflows/release.yml`.
 
-Outcomes:
+### Step 4 — Automated `.github/workflows/release.yml` execution order
 
-- `in-sync` — the page carries the content hash and tag reference and the required assets.
-- `drift` — reported with specific findings. The command still exits `0`; drift never invalidates a
-  release, and the tool never edits a page. Pass `--fail-on-drift` if you want a blocking gate.
-- `recorded-no-op` — the provider has no release API, or the forge was unavailable, and an
-  `operatorEvidenceReference` was supplied. Without that reference this is reported as drift, so a
-  silent omission cannot pass as a deliberate no-op.
+The workflow executes six least-privilege jobs under per-tag concurrency (`cancel-in-progress: false`) and the protected `release` environment:
 
-If the local `release-notes.md` no longer hashes to the value in `release-evidence.v1.json`, the
-command fails closed with `drift_release_notes_mismatch`. That is a local checkout problem, not a
-forge problem: fix the checkout before drawing conclusions about a published page.
+1. **`preflight` (`contents: read`):** runs `verify-release-tag --tag <tag> --event-sha <sha>` against `eng/release/trust/allowed-signers`, runs the pre-build sealed-release guard BEFORE requiring mirror credentials:
+   - HTTP `404` → proceeds (`should-publish=true`) and then validates `vars.CONTAINER_REGISTRY` / `vars.CONTAINER_REGISTRY_USER` / optional `vars.CONTAINER_REGISTRY_LOGIN_USER` / `secrets.CONTAINER_REGISTRY_PASSWORD` (GHCR-only `4` refs when unset or `ghcr.io`, or `8` refs with an external OCI mirror).
+   - HTTP `200` → downloads existing published assets and verifies `SHA256SUMS`, `cosign verify-blob` against `release.yml@refs/tags/<tag>`, and `release-artifact-manifest.v1.json` (`version`, `tag`, `sourceCommitOid`, 4 images, symmetric canonical references). Matching sealed releases exit `0` as an idempotent no-op with zero builds even if mirror credentials were rotated or removed; any mismatch fails closed.
+   - Any other HTTP status → fails closed before building.
+2. **`build-images` (`_container-build.yml`, `push-mode: digest-only`):** builds all four multi-arch `.NET 10` OCI indexes (`islamu-event-api`, `islamu-event-ui`, `islamu-event-standalone`, `islamu-event-migration-service`) with zero GHA build cache, exports Buildx SBOM/provenance inspections, scans with Trivy (`CRITICAL,HIGH`), stages by digest only (`push=true,push-by-digest=true,name-canonical=true`) to GHCR (and the configured external OCI mirror, if any) with **no registry tags**, and creates/verifies GHCR SLSA attestations. Artifact uploads set `overwrite: true` so job reruns do not collide on `409 Conflict`.
+3. **`prepare-and-seal` (`contents: read`):** assembles canonical `release-images.v1.json` (4 images and every staged canonical tagless reference), provisions verified `git-cliff` `2.14.2`, runs offline `prepare <release-dir> --image-manifest release-images.v1.json` (Stage 1 transient `--context` → Stage 2 allowlisted `release-rendering-context.v1.json` → Stage 3 `--from-context -` three-persona `release-notes.md`), and runs `seal-artifacts` into a fresh temp directory to produce `release-artifact-manifest.v1.json` and sorted `SHA256SUMS` without clobbering.
+4. **`sign-and-attest` (`packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write`):** verifies sealed checksums and exact 7-file inventory, generates GitHub SLSA file attestations (`actions/attest`), Cosign-signs and verifies **every** canonical `registry/repository@sha256:<digest>` reference across every configured registry individually, signs and verifies `SHA256SUMS` via `cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json`, and verifies every GitHub file attestation via `gh attestation verify`.
+5. **`publish-release` (`contents: write` only):** re-verifies `SHA256SUMS` and `SHA256SUMS.sigstore.json`, verifies remote tag-object binding (`refs/tags/<tag>` object type `tag`, SHA `== tag-object-id`, target commit `== target-commit`), and derives the required `prerelease` boolean from the governed tag (`true` for prerelease tags containing `-`, `false` for stable tags). If a failed-job retry sees an already-published release (for example after `PATCH draft=false` succeeded but the post-publish read timed out), it verifies tag binding, `prerelease` status, exact 8-asset inventory, deterministic asset bytes, checksums, and Cosign OIDC bundle read-only without editing the release (failing closed on any mismatch or ambiguity). Otherwise it creates or resumes a single draft GitHub Release by numeric ID without `--clobber` (refusing multiple drafts, wrong target commit, mismatched `prerelease` flag, unexpected assets, or differing deterministic asset bytes; preserving an existing draft `SHA256SUMS.sigstore.json` only if it independently verifies `SHA256SUMS` via Cosign), downloads all 8 draft assets to verify byte-for-byte equality + `sha256sum --check SHA256SUMS` + `cosign verify-blob`, re-verifies tag binding, draft `.tag_name`, `.prerelease`, and exact draft asset identities `(id, name, size, updated_at, digest)` immediately before publishing once (`PATCH /releases/<draft-id>` with `draft=false` and explicit `prerelease`), and immediately runs a post-publish round-trip verification (failing loudly and blocking `append-contributors` if any mutation occurred in the publish window).
+6. **`append-contributors` (`contents: write`, `continue-on-error: true`):** runs AFTER sealed publication and post-publish verification using verified `git-cliff` `2.14.2` with `eng/release/cliff-github-contributors.toml` and `--no-exec` (the sole online exception). Rejects any email address pattern, degrades cleanly to unchanged identity-free signed notes if remote metadata is absent or fails, and appends `@handle` / PR links exclusively to the mutable GitHub Release body.
 
-### Maintenance lines (open on demand, delete freely)
+### Step 5 — Synchronize the public changelog ledger (post-tag signed sealed archive)
 
-No branch is provisioned when a release is tagged. The default state after `v0.1.0` is
-one tag and zero new branches. Open a maintenance line only when a real backport to an
-already-released line is required:
+Because generated release artifacts are built and sealed **after** tagging (so they include real built OCI image digests), synchronize `docs/public/changelog/README.md` in a normal post-release PR without ever moving the signed tag:
 
-```sh
-git switch -c release/<major>.<minor> v<major>.<minor>.<patch>
+1. Set `SEALED_ROOT` to `docs/internal/releases` (recommended so the verified archive is committed for future offline CI `--check` runs, leaving committed `release.yaml` and `summary.md` untouched) — or to an external staging directory — and download the published eight release assets for `v<version>` into `"${SEALED_ROOT}/<version>/"`.
+2. Authenticate `"${SEALED_ROOT}/<version>/SHA256SUMS"` online with `cosign verify-blob` (`SHA256SUMS.sigstore.json`) and `gh attestation verify` against `.github/workflows/release.yml@refs/tags/v<version>` before trusting the downloaded files.
+3. Countersign the verified `SHA256SUMS` offline inside the selected artifact root with your enrolled release signing key under the dedicated `islamu-release-checksums` namespace (producing `"${SEALED_ROOT}/<version>/SHA256SUMS.sig"` so offline `sync-public-changelog --check` cryptographically rejects any unsigned or re-sealed working-tree edits):
+
+```bash
+SEALED_ROOT="docs/internal/releases" # or your chosen external staging root
+
+ssh-keygen -Y sign -f /path/to/release-signing-key \
+  -n islamu-release-checksums \
+  "${SEALED_ROOT}/<version>/SHA256SUMS"
 ```
 
-Plan the action first. The engine derives the source from the release's own verified tag, so
-there is no source argument to get wrong:
+4. Run `sync-public-changelog` (and verify with `--check`), passing `--sealed-artifacts-root "${SEALED_ROOT}"` (optional when `SEALED_ROOT` is the default `docs/internal/releases`):
 
-```sh
-dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  open-maintenance-line docs/internal/releases/<version> <full-tag-object-id>
+```bash
+dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
+  sync-public-changelog --publication-base https://github.com/islamu-ngo/Event/blob/ \
+  --sealed-artifacts-root "${SEALED_ROOT}"
+
+dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
+  sync-public-changelog --publication-base https://github.com/islamu-ngo/Event/blob/ \
+  --sealed-artifacts-root "${SEALED_ROOT}" --check
 ```
 
-It re-verifies the tag through the promoted bundle, refuses prereleases, derives
-`refs/heads/release/<major>.<minor>` from the version-line label, and prints one bounded line:
+`sync-public-changelog` cryptographically verifies both the SSH-signed annotated tag `v<version>` (`git` namespace, confirming `release.yaml`, `summary.md`, and every linked `CHG-*.yaml` byte-match the signed tag's target commit tree) AND the OpenSSH detached signature `SHA256SUMS.sig` (`islamu-release-checksums` namespace against `allowed-signers`, binding exact `SHA256SUMS`, `release-artifact-manifest.v1.json` with `sourceCommitOid == targetCommitOid`, `release-images.v1.json`, `release-context.v1.json`, `release-notes.md`, `contract-diff.v1.json`, and `release-rendering-context.v1.json`), writes the updated entries-only projection and `publication-manifest.v1.json` (preserving YAML frontmatter), and fails closed on any tamper, unauthorized key, wrong namespace, or re-sealed unsigned working-tree edit. Commit the signed sealed release archive (including `SHA256SUMS.sig`) plus `docs/public/changelog/README.md` and `docs/public/changelog/publication-manifest.v1.json` via PR so future CI `--check` runs and subsequent releases verify 100% offline.
 
-```text
-maintenance_line_verified: action=create-maintenance-line branch=refs/heads/release/<M>.<m> source-tag=v<M>.<m>.<p> expected-old=none expected-new=<full-B-oid> instruction=git switch -c release/<M>.<m> v<M>.<m>.<p>
-```
+## Failure recovery and non-atomicity rules
 
-If the branch already contains the released commit the action is `already-open` with
-`instruction=no-op-maintenance-line-already-open`. The command never creates, moves, deletes, or
-force-updates a ref; the operator runs the printed command.
+GitHub Releases, GHCR, and any configured external OCI mirror do **not** commit atomically, and GitHub's REST API does not provide atomic compare-and-swap on `draft=false`. Restrict repository `contents: write` access and enforce a `v*` tag ruleset to close the authorized-editor window. Follow these exact recovery rules:
 
-Rules:
+| Failure point | Observable staging state | Required operator action |
+|---|---|---|
+| Failure in `preflight` | Zero images built, zero drafts, zero public release. | Fix signer enrollment, tag binding, or release inputs; never force-move an already-shared tag. |
+| Failure during `build-images` or `sign-and-attest` | One or more unadvertised digest-only OCI objects may exist in GHCR (and any configured external OCI mirror), with zero registry tags assigned and no draft or public release. | Diagnose the failure (Trivy CVE, registry outage, OIDC/Cosign error) and rerun failed jobs for the same tag. Digest-only objects remain unadvertised until signed and published. |
+| Failure during `publish-release` before `draft=false` | An unpublished draft GitHub Release with partial or complete assets may exist alongside staged digest-only OCI indexes. | Prefer GitHub Actions **"Re-run failed jobs"** so `publish-release` reuses the original verified `release-signed-<version>` workflow artifact without minting a second Sigstore bundle. Even on a full rerun, `publish-release` verifies all 7 deterministic assets byte-for-byte without `--clobber` and preserves an existing draft `SHA256SUMS.sigstore.json` only after independently verifying it with Cosign. If an interrupted draft contains corrupted partial assets, delete the **unpublished draft** after recording incident evidence and rerun (never delete a published release). |
+| Failure in post-publish verification (`publish-release`) | A published release diverged from the pre-publish verified snapshot or tag object. | Treat as a security incident (`append-contributors` is blocked automatically): inspect GitHub audit logs, do not silently overwrite assets, and publish a security advisory and corrective patch release. |
+| Failure in `append-contributors` | Published release is 100% valid, signed, attested, and identity-free; only the mutable contributor footer was omitted. | Optional: rerun or leave identity-free. Never rebuild, re-sign, or modify sealed assets. |
+| Defect discovered AFTER publication | Sealed release and assets are immutable. | **Never** replace assets, overwrite `SHA256SUMS`, delete/recreate the tag, or rewrite history. Publish a corrective patch release (`v<major>.<minor>.<patch+1>`) and security/operational advisory. |
+| Contributor edit or removal request | Contributor `@handle` appears only in the mutable GitHub Release page body. | Edit the GitHub Release page body directly to adjust or remove the requested handle. Signed `release-notes.md`, `SHA256SUMS`, `SHA256SUMS.sigstore.json`, and all attestations remain cryptographically valid untouched. |
 
-- The **only** legal source is a verified signed stable tag on that line. `develop`,
-  `main`, and arbitrary commits are rejected with `maintenance_line_source_not_release_tag`,
-  because a branch cut from anywhere else contains commits that were never in the release and a
-  patch built on it would ship unreviewed integration work.
-- The branch MUST be named `release/<major>.<minor>` — no `v` prefix. `refs/heads/v*` is
-  a reserved, protected namespace owned by version tags; creation there is rejected by
-  provider settings and by `ReleaseRefNamespacePolicy`.
-- Re-running against an existing branch is a no-op. Never force-update it.
-- Deleting the branch after its final patch is supported, non-destructive cleanup:
+## Authorized post-merge release-candidate rehearsal
 
-```sh
-git branch -D release/<major>.<minor>
-git push origin --delete release/<major>.<minor>
-```
+Source-level tests, `actionlint`, `zizmor`, and CI validators do **not** prove live GitHub OIDC, GHCR or external OCI registry digest-only push behavior, Cosign OCI/blob verification, or draft recovery. Before declaring operational readiness for `v0.1.0`, execute this rehearsal with explicit Project Steward approval:
 
-Every release on that line remains fully verifiable afterwards, because verification
-reads only the tag object, `B`, the tree at `B`, and ancestry from the base tag. To
-reconstruct the line at any later time, re-run the `git switch -c` command above.
-
-### Trust activation (two people, once)
-
-Until this runs, `eng/release/trust/` is comment-only and every attestation path fails closed. That
-is the correct default: a release-signing root asserted by nobody is worse than no root at all.
-
-Activation is deliberately a **two-person act**. `separationOfDuty.releaseSignerCannotPromoteOwnCandidateBundle`
-means one key must never be able to both promote the tooling bundle and sign the release that bundle
-attests — otherwise a single compromised key forges the entire chain. Two people therefore each
-generate their own key and keep their own private half:
-
-```sh
-# Release operator, on their own machine:
-ssh-keygen -t ed25519 -C "islamu-release-operator"
-
-# Tooling promoter, on a different machine:
-ssh-keygen -t ed25519 -C "islamu-tooling-promoter"
-```
-
-Each person sends **only the `.pub` file**. Private keys never enter this repository, a trusted
-bundle, a CI secret store, or a chat message. Then, with both public keys present:
-
-```sh
-dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  activate-trust \
-  --release-principal <release-operator-principal> \
-  --release-key /path/to/release.pub \
-  --promotion-principal <tooling-promoter-principal> \
-  --promotion-key /path/to/promotion.pub \
-  --valid-from <yyyy-MM-dd> --valid-until <yyyy-MM-dd> \
-  --output eng/release/trust
-```
-
-The command accepts public key material only and refuses a file containing `PRIVATE KEY`. It
-rejects a non-`ssh-ed25519` algorithm, a malformed key, an inverted or malformed validity window, a
-malformed principal, and any attempt to use one principal, one key, or one fingerprint for both
-roles. It writes `allowed-signers`, `promotion-allowed-signers`, and an activated
-`release-signing-policy.yaml`, then prints both fingerprints:
-
-```text
-trust_activated: output=eng/release/trust
-trust_release_signer: principal=... algorithm=ssh-ed25519 fingerprint=SHA256:... valid-from=... valid-until=...
-trust_promotion_signer: principal=... algorithm=ssh-ed25519 fingerprint=SHA256:...
-```
-
-Re-running with identical inputs is a byte-idempotent no-op. Replacing an already-activated root is
-a **rotation**, not an activation: it fails with `trust_activation_would_replace_existing_root`
-unless `--replace` is passed, and the rotation must also be appended to
-`eng/release/trust/rotation-history.md`.
-
-Both fingerprints must be confirmed out of band with the two key holders before the first release is
-signed, and `genesisIndependentReviewRequired` still applies to the first promoted bundle.
-
-### Trusted-bundle bootstrap and upgrades
-
-Genesis promotion is a required operator action because no earlier release engine can
-validate the first bundle. Independent reviewers must bind the exact source and tool
-hashes to a Release build, focused release-engine tests, SBOM, checksums, protected
-approval, and an SSH-signed annotated tooling tag. Later upgrades use the same
-separate promotion lane and cite the previously promoted bundle; candidate checkout
-content is never promotion evidence.
-
-Final attestation receives the promoted bundle plus its separately stored authoritative
-receipt and detached signature. The already promoted verifier uses only its protected
-runtime trust root to verify the receipt before using the receipt-bound manifest
-SHA-256, then verifies authoritative manifest bytes, required and complete file sets,
-  every file hash, and policy/config/trust versions and digests. Reusing the same signed
-  receipt for the exact same manifest is an idempotent read-only verification, not a
-  replay decision; the verifier stores no receipt registry and accepts no caller replay
-  state. Manifest, receipt, signature, trust-root, file-count, per-file, total-size,
-  path-length, path-depth, hardlink/link-count, and enumeration limits fail closed.
-  Traversal, root aliases, symbolic links, duplicate normalized paths, and
-  case-insensitive path collisions also fail before payload hashing. Final jobs must
-  reverify the promoted bundle immediately before use from immutable promoted storage.
-  Candidate executables run only in an unprivileged preview lane.
-
-Task 5 tag verification must derive `SshTagAuthorizationRequest` signer, signature,
-tag-kind, verification-date, and tag-object facts from local Git objects and local
-OpenSSH verification evidence. Forge badges, provider UI states, or hosted release
-metadata are never signer evidence.
-
-Production activation remains blocked: no real release/tooling principals, public
-keys, custody/rotation owners, or promoted artifact store and retention authority are
-recorded. `eng/release/trust/allowed-signers` and the verifier-owned
-`eng/release/trust/promotion-allowed-signers` are intentionally comment-only until a
-reviewed promotion adds real principals and public keys, so activation returns
-`trusted_bundle_promotion_authority_not_configured` and fails closed.
-
-The first-release baseline is also blocked until the Project Steward approves the first
-governed version and the real merged activation commit exists. Do not create a real
-baseline tag, signed release tag, or versioned release directory from placeholders.
-
-### Restricted security input
-
-Embargo input is a separate access-controlled input mounted only after candidate code
-has stopped. It must not enter the public checkout, candidate bundle, authoritative
-context, notes, manifests, checksums, retained diagnostics, logs, or provider
-metadata. Diagnostics use bounded codes only and never echo paths, identities,
-secrets, provider data, restricted values, or raw exception text. After disclosure
-authorization, only the reviewed public disposition and public advisory reference may
-cross into authoritative generation, and neither field may exactly alias restricted
-details, secret material, identities, storage paths, or provider metadata after
-Unicode and whitespace normalization; otherwise the release stops.
-
-## Stop and recovery rules
-
-- Stop on missing Git objects, shallow/partial history, ref replacement, policy or
-  bundle mismatch, renderer drift, unauthorized/unsigned/replaced tags, or a moved
-  branch. Correct the input or promote a new bundle; do not bypass the check.
-- If `B` changes after candidate verification, discard its candidate evidence and
-  return to generation/review. Do not retarget a tag or force-push `main`.
-- If an embargo field appears in a public artifact, stop publication, revoke public
-  artifact access where possible, preserve incident evidence without reproducing the
-  restricted value, and use the security incident process before retrying.
-- If provider transport fails after local verification, retain local evidence and
-  resolve the protected adapter failure. The provider adapter is not permitted to
-  regenerate or reinterpret the governed release.
+1. Enroll the reviewed release signer key in `eng/release/trust/allowed-signers` and configure the protected `release` environment (required reviewers, `v*` tag protection + tag ruleset, plus optional `vars.CONTAINER_REGISTRY` / `vars.CONTAINER_REGISTRY_USER` / `vars.CONTAINER_REGISTRY_LOGIN_USER` / `secrets.CONTAINER_REGISTRY_PASSWORD` if mirroring beyond GHCR).
+2. Tag a signed release candidate (for example `v0.1.0-rc.1`) targeting an approved commit with `release.yaml` and `summary.md` (and confirm `deploy-coolify.yml` does NOT trigger on the tag push).
+3. **Fault-injection drill:** abort or inject a failure after digest-only staging and before signing completes. Confirm:
+   - Zero public GitHub Release exists.
+   - Zero mutable or version tags exist in GHCR (or any configured external OCI registry) for the staged images.
+   - Residual staging state is accurately logged.
+4. **Recovery & full verification drill:** rerun the workflow for the same signed tag without replacing assets. Independently verify (using an independently obtained trusted `allowed-signers` copy):
+   - `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=/path/to/trusted-allowed-signers verify-tag v0.1.0-rc.1`
+   - `cosign verify-blob --bundle SHA256SUMS.sigstore.json ... SHA256SUMS` (authenticate `SHA256SUMS` FIRST)
+   - `sha256sum --check SHA256SUMS` (verify assets against the authenticated checksums)
+   - `cosign verify` on **every** canonical `registry/repository@sha256:<digest>` reference listed in `release-artifact-manifest.v1.json` (4 in GHCR-only mode; 8 when a secondary registry is configured)
+   - `gh attestation verify` on all seven attested files and all four GHCR OCI digests
+   - Re-triggering the workflow on the already-published tag exits `0` at `preflight` as an idempotent no-op with zero container builds (even when mirror credentials are absent).
+   - Contributor API failure/omission preserves the valid identity-free release.

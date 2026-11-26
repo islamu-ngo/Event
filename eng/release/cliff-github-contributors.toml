@@ -1,0 +1,63 @@
+# Mutable Model 2 contributor projection for the GitHub Release page body only.
+# Runs AFTER SHA256SUMS sealing and Cosign signing, with verified git-cliff 2.14.2 and --no-exec.
+# Never outputs raw email addresses and degrades cleanly to empty output when remote metadata is unavailable.
+
+[changelog]
+body = """
+{% if github and github.contributors and github.contributors | length > 0 -%}
+## Contributors
+
+Thank you to everyone who contributed to this release:
+
+{% for contributor in github.contributors -%}
+{% if contributor.username -%}
+- @{{ contributor.username }}{% if contributor.pr_number and remote and remote.github and remote.github.owner and remote.github.repo %} ([#{{ contributor.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ contributor.pr_number }})){% elif contributor.pr_number %} (#{{ contributor.pr_number }}){% endif %}
+{% endif -%}
+{% endfor %}
+{% set first_timers = github.contributors | filter(attribute="is_first_time", value=true) -%}
+{% if first_timers | length > 0 -%}
+### New Contributors
+
+{% for contributor in first_timers -%}
+{% if contributor.username -%}
+- @{{ contributor.username }} made their first contribution{% if contributor.pr_number and remote and remote.github and remote.github.owner and remote.github.repo %} in [#{{ contributor.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ contributor.pr_number }}){% elif contributor.pr_number %} in #{{ contributor.pr_number }}{% endif %}
+{% endif -%}
+{% endfor %}
+{% endif -%}
+{% else -%}
+{% set credited_commits = commits | filter(attribute="remote") -%}
+{% if credited_commits | length > 0 -%}
+## Contributors
+
+Thank you to everyone who contributed pull requests to this release:
+
+{% for commit in credited_commits -%}
+{% if commit.remote.pr_author -%}
+- @{{ commit.remote.pr_author }}{% if commit.remote.pr_number and remote and remote.github and remote.github.owner and remote.github.repo %} ([#{{ commit.remote.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }})){% elif commit.remote.pr_number %} (#{{ commit.remote.pr_number }}){% endif %}
+{% elif commit.remote.username -%}
+- @{{ commit.remote.username }}{% if commit.remote.pr_number and remote and remote.github and remote.github.owner and remote.github.repo %} ([#{{ commit.remote.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }})){% elif commit.remote.pr_number %} (#{{ commit.remote.pr_number }}){% endif %}
+{% endif -%}
+{% endfor %}
+{% endif -%}
+{% endif -%}
+"""
+trim = true
+render_always = false
+format = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+fail_on_unmatched_commit = false
+filter_commits = false
+tag_pattern = "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-(?:alpha|beta|rc)\\.[0-9]+)?$"
+commit_parsers = [
+  { message = "^Merge ", skip = true },
+  { message = ".*", group = "Changes" },
+]
+
+[remote.github]
+owner = "islamu-ngo"
+repo = "Event"

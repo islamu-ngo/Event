@@ -1,0 +1,1085 @@
+name: Release Publication
+
+permissions: {}
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-alpha.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
+
+concurrency:
+  group: release-publication-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Verify Signed Tag, Registry Config, And Sealed Release State
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+    outputs:
+      tag-name: ${{ steps.verify-tag.outputs.tag-name }}
+      version: ${{ steps.verify-tag.outputs.version }}
+      target-commit: ${{ steps.verify-tag.outputs.target-commit }}
+      tag-object-id: ${{ steps.verify-tag.outputs.tag-object-id }}
+      signer-principal: ${{ steps.verify-tag.outputs.signer-principal }}
+      release-dir: ${{ steps.verify-tag.outputs.release-dir }}
+      secondary-registry: ${{ steps.resolve-registries.outputs.secondary-registry }}
+      secondary-registry-user: ${{ steps.resolve-registries.outputs.secondary-registry-user }}
+      secondary-registry-login-user: ${{ steps.resolve-registries.outputs.secondary-registry-login-user }}
+      expected-reference-count: ${{ steps.resolve-registries.outputs.expected-reference-count }}
+      should-publish: ${{ steps.publication-guard.outputs.should-publish }}
+      publication-state: ${{ steps.publication-guard.outputs.publication-state }}
+
+    steps:
+      - name: Checkout repository with full tag history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
+        with:
+          cosign-release: "v3.1.5"
+
+      - name: Verify annotated SSH-signed tag and source commit binding
+        id: verify-tag
+        shell: bash
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          TAG_NAME: ${{ github.ref_name }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${REF_TYPE}" != "tag" ]]; then
+            echo "Release publication requires a tag push event; received ref_type='${REF_TYPE}'." >&2
+            exit 1
+          fi
+
+          if [[ ! "${TAG_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.[1-9][0-9]*)?$ ]]; then
+            echo "Tag '${TAG_NAME}' does not match governed release SemVer tag pattern." >&2
+            exit 1
+          fi
+
+          version="${TAG_NAME#v}"
+          release_dir="docs/internal/releases/${version}"
+          if [[ ! -f "${release_dir}/release.yaml" || ! -f "${release_dir}/summary.md" ]]; then
+            echo "Required release inputs missing under '${release_dir}' at commit ${EVENT_SHA}." >&2
+            exit 1
+          fi
+
+          release_proj="eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj"
+          dotnet restore "${release_proj}" --locked-mode --verbosity quiet
+          dotnet build "${release_proj}" --configuration Release --no-restore -m:1 -nr:false --verbosity quiet
+
+          verify_output="$(dotnet run --project "${release_proj}" --configuration Release --no-build -- \
+            verify-release-tag \
+            --tag "${TAG_NAME}" \
+            --event-sha "${EVENT_SHA}" \
+            --allowed-signers "eng/release/trust/allowed-signers")"
+          printf '%s\n' "${verify_output}"
+
+          target_commit="$(printf '%s\n' "${verify_output}" | sed -nE 's/^verified_release_tag: [^ ]+ target=([0-9a-f]{40,64}) tag_object=([0-9a-f]{40,64}) signer=(.+)$/\1/p')"
+          tag_object_id="$(printf '%s\n' "${verify_output}" | sed -nE 's/^verified_release_tag: [^ ]+ target=([0-9a-f]{40,64}) tag_object=([0-9a-f]{40,64}) signer=(.+)$/\2/p')"
+          signer_principal="$(printf '%s\n' "${verify_output}" | sed -nE 's/^verified_release_tag: [^ ]+ target=([0-9a-f]{40,64}) tag_object=([0-9a-f]{40,64}) signer=(.+)$/\3/p')"
+
+          if [[ -z "${target_commit}" || -z "${tag_object_id}" || -z "${signer_principal}" ]]; then
+            echo "Could not parse verified tag metadata from verify-release-tag output." >&2
+            exit 1
+          fi
+
+          if [[ "${target_commit}" != "${EVENT_SHA}" ]]; then
+            echo "Verified tag target '${target_commit}' does not equal event SHA '${EVENT_SHA}'." >&2
+            exit 1
+          fi
+
+          {
+            echo "tag-name=${TAG_NAME}"
+            echo "version=${version}"
+            echo "target-commit=${target_commit}"
+            echo "tag-object-id=${tag_object_id}"
+            echo "signer-principal=${signer_principal}"
+            echo "release-dir=${release_dir}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Signed Release Tag Verification"
+            echo
+            echo "- Tag: \`${TAG_NAME}\`"
+            echo "- Tag object OID: \`${tag_object_id}\`"
+            echo "- Target commit OID: \`${target_commit}\`"
+            echo "- Authorized signer: \`${signer_principal}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guard against clobbering an existing published release before requiring mirror credentials or building
+        id: publication-guard
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.verify-tag.outputs.tag-name }}
+          VERSION: ${{ steps.verify-tag.outputs.version }}
+          TARGET_COMMIT: ${{ steps.verify-tag.outputs.target-commit }}
+        run: |
+          set -euo pipefail
+
+          existing_json="$(mktemp "${RUNNER_TEMP}/existing-published-release.XXXXXX.json")"
+          http_code="$(curl -sS -w '%{http_code}' -o "${existing_json}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG_NAME}")"
+
+          if [[ "${http_code}" == "404" ]]; then
+            {
+              echo "should-publish=true"
+              echo "publication-state=new"
+            } >> "$GITHUB_OUTPUT"
+            echo "No published GitHub Release exists for ${TAG_NAME}; proceeding to registry resolution and digest-only container staging." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ "${http_code}" != "200" ]]; then
+            echo "GitHub Releases lookup for ${TAG_NAME} returned unexpected HTTP ${http_code}; failing closed before build." >&2
+            exit 1
+          fi
+
+          echo "Existing published release detected for ${TAG_NAME}; verifying sealed assets cryptographically without rebuilding or replacing."
+          is_draft="$(jq -r '.draft' "${existing_json}")"
+          if [[ "${is_draft}" != "false" ]]; then
+            echo "Unexpected draft response on /releases/tags/${TAG_NAME}; failing closed." >&2
+            exit 1
+          fi
+
+          expected_assets=(
+            "SHA256SUMS"
+            "SHA256SUMS.sigstore.json"
+            "contract-diff.v1.json"
+            "release-artifact-manifest.v1.json"
+            "release-context.v1.json"
+            "release-images.v1.json"
+            "release-notes.md"
+            "release-rendering-context.v1.json"
+          )
+
+          actual_assets="$(jq -r '.assets[].name' "${existing_json}" | LC_ALL=C sort)"
+          expected_sorted="$(printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort)"
+          if [[ "${actual_assets}" != "${expected_sorted}" ]]; then
+            echo "Existing published release ${TAG_NAME} asset inventory does not match sealed release contract; refusing to overwrite." >&2
+            exit 1
+          fi
+
+          verify_dir="$(mktemp -d "${RUNNER_TEMP}/verify-existing-${VERSION}.XXXXXX")"
+          gh release download "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --dir "${verify_dir}"
+
+          (cd "${verify_dir}" && sha256sum --check SHA256SUMS)
+
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${TAG_NAME}"
+          cosign verify-blob \
+            --bundle "${verify_dir}/SHA256SUMS.sigstore.json" \
+            --certificate-identity "${expected_identity}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${verify_dir}/SHA256SUMS"
+
+          manifest_version="$(jq -r '.version' "${verify_dir}/release-artifact-manifest.v1.json")"
+          manifest_tag="$(jq -r '.tag' "${verify_dir}/release-artifact-manifest.v1.json")"
+          manifest_commit="$(jq -r '.sourceCommitOid' "${verify_dir}/release-artifact-manifest.v1.json")"
+          image_count="$(jq '.images | length' "${verify_dir}/release-artifact-manifest.v1.json")"
+          ref_count="$(jq '[.images[].canonicalReferences[]] | length' "${verify_dir}/release-artifact-manifest.v1.json")"
+
+          if [[ "${manifest_version}" != "${VERSION}" || "${manifest_tag}" != "${TAG_NAME}" || "${manifest_commit}" != "${TARGET_COMMIT}" || "${image_count}" -ne 4 || "${ref_count}" -lt 4 || $((ref_count % 4)) -ne 0 ]]; then
+            echo "Existing published release manifest identity mismatch (version=${manifest_version}, tag=${manifest_tag}, commit=${manifest_commit}, images=${image_count}, refs=${ref_count}); failing closed." >&2
+            exit 1
+          fi
+
+          {
+            echo "should-publish=false"
+            echo "publication-state=already-published-verified"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Pre-Build Sealed Release Guard"
+            echo
+            echo "Published release \`${TAG_NAME}\` already exists and passed SHA256SUMS, Cosign OIDC bundle, and commit-binding verification. Stopping as an idempotent no-op with zero container builds or asset replacements."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve configured OCI container registries from GitHub Variables and Secrets
+        id: resolve-registries
+        shell: bash
+        env:
+          SHOULD_PUBLISH: ${{ steps.publication-guard.outputs.should-publish }}
+          CONFIGURED_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          CONFIGURED_REGISTRY_USER: ${{ vars.CONTAINER_REGISTRY_USER }}
+          CONFIGURED_REGISTRY_LOGIN_USER: ${{ vars.CONTAINER_REGISTRY_LOGIN_USER }}
+          REGISTRY_SECRET_PRESENT: ${{ secrets.CONTAINER_REGISTRY_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${SHOULD_PUBLISH}" != "true" ]]; then
+            {
+              echo "secondary-registry="
+              echo "secondary-registry-user="
+              echo "secondary-registry-login-user="
+              echo "expected-reference-count=0"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          trimmed_registry="${CONFIGURED_REGISTRY#"${CONFIGURED_REGISTRY%%[![:space:]]*}"}"
+          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
+          effective_registry="${trimmed_registry,,}"
+
+          trimmed_user="${CONFIGURED_REGISTRY_USER#"${CONFIGURED_REGISTRY_USER%%[![:space:]]*}"}"
+          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
+          effective_user="${trimmed_user,,}"
+
+          trimmed_login_user="${CONFIGURED_REGISTRY_LOGIN_USER#"${CONFIGURED_REGISTRY_LOGIN_USER%%[![:space:]]*}"}"
+          trimmed_login_user="${trimmed_login_user%"${trimmed_login_user##*[![:space:]]}"}"
+
+          if [[ -z "${effective_registry}" || "${effective_registry}" == "ghcr.io" ]]; then
+            {
+              echo "secondary-registry="
+              echo "secondary-registry-user="
+              echo "secondary-registry-login-user="
+              echo "expected-reference-count=4"
+            } >> "$GITHUB_OUTPUT"
+
+            {
+              echo "## Target Container Registries"
+              echo
+              echo "- Primary (built-in): \`ghcr.io\` (4 canonical digest references)"
+              echo "- Secondary mirror: not configured (set \`vars.CONTAINER_REGISTRY\`, \`vars.CONTAINER_REGISTRY_USER\`, optional \`vars.CONTAINER_REGISTRY_LOGIN_USER\`, and \`secrets.CONTAINER_REGISTRY_PASSWORD\` to enable an additional OCI registry)"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ ! "${effective_registry}" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[0-9]{1,5})?$ ]]; then
+            echo "Invalid vars.CONTAINER_REGISTRY hostname '${effective_registry}'." >&2
+            exit 1
+          fi
+
+          if [[ -z "${effective_user}" || ! "${effective_user}" =~ ^[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*(/[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*)*$ ]]; then
+            echo "vars.CONTAINER_REGISTRY_USER must be configured with a valid OCI namespace when vars.CONTAINER_REGISTRY='${effective_registry}'." >&2
+            exit 1
+          fi
+
+          effective_login_user="${trimmed_login_user:-${effective_user}}"
+          if [[ -z "${effective_login_user}" || "${effective_login_user}" =~ [[:space:][:cntrl:]] ]]; then
+            echo "vars.CONTAINER_REGISTRY_LOGIN_USER must be a single-token login username without whitespace or control characters." >&2
+            exit 1
+          fi
+
+          if [[ "${REGISTRY_SECRET_PRESENT}" != "true" ]]; then
+            echo "secrets.CONTAINER_REGISTRY_PASSWORD must be configured in the release environment when vars.CONTAINER_REGISTRY='${effective_registry}'." >&2
+            exit 1
+          fi
+
+          {
+            echo "secondary-registry=${effective_registry}"
+            echo "secondary-registry-user=${effective_user}"
+            echo "secondary-registry-login-user=${effective_login_user}"
+            echo "expected-reference-count=8"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Target Container Registries"
+            echo
+            echo "- Primary (built-in): \`ghcr.io\`"
+            echo "- Secondary mirror: \`${effective_registry}/${effective_user}\` (8 canonical digest references total)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build-images:
+    name: Stage .NET 10 OCI Indexes (Digest Only)
+    needs: [preflight]
+    if: ${{ needs.preflight.outputs.should-publish == 'true' }}
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      artifact-metadata: write
+      id-token: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - component: api
+            image-name: islamu-event-api
+            dockerfile: src/Explore.API/Dockerfile
+          - component: blazor
+            image-name: islamu-event-ui
+            dockerfile: src/Explore.Blazor/Dockerfile
+          - component: standalone
+            image-name: islamu-event-standalone
+            dockerfile: src/Event.Standalone/Dockerfile
+          - component: migration
+            image-name: islamu-event-migration-service
+            dockerfile: src/Event.MigrationService/Dockerfile
+    uses: ./.github/workflows/_container-build.yml
+    with:
+      image-name: ${{ matrix.image-name }}
+      dockerfile: ${{ matrix.dockerfile }}
+      context: "."
+      push-mode: "digest-only"
+      environment: "release"
+      build-configuration: "Release"
+      platforms: "linux/amd64,linux/arm64"
+      registry: ${{ needs.preflight.outputs.secondary-registry }}
+      registry-user: ${{ needs.preflight.outputs.secondary-registry-user }}
+      registry-login-user: ${{ needs.preflight.outputs.secondary-registry-login-user }}
+    secrets:
+      CONTAINER_REGISTRY_PASSWORD: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+
+  prepare-and-seal:
+    name: Assemble Image Manifest, Render Notes, And Seal Artifacts
+    needs: [preflight, build-images]
+    if: ${{ needs.preflight.outputs.should-publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository with full tag history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Download digest-only container build evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: container-build-*
+          path: artifacts/container-build
+          merge-multiple: true
+
+      - name: Assemble canonical release-images.v1.json from four digest-only builds
+        shell: bash
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+          TARGET_COMMIT: ${{ needs.preflight.outputs.target-commit }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/release-staging
+
+          read_image_entry() {
+            local component="$1"
+            local image_name="$2"
+            local digest_file="artifacts/container-build/${image_name}-digest.json"
+            if [[ ! -f "${digest_file}" ]]; then
+              echo "Missing container build digest evidence: ${digest_file}" >&2
+              exit 1
+            fi
+
+            local push_mode digest refs_json
+            push_mode="$(jq -r '.pushMode' "${digest_file}")"
+            digest="$(jq -r '.digest' "${digest_file}")"
+            refs_json="$(jq -c '.references | sort' "${digest_file}")"
+
+            if [[ "${push_mode}" != "digest-only" ]]; then
+              echo "Container build '${image_name}' was not staged in digest-only mode (pushMode=${push_mode})." >&2
+              exit 1
+            fi
+
+            if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Invalid digest for '${image_name}': '${digest}'." >&2
+              exit 1
+            fi
+
+            jq -n \
+              --arg name "${component}" \
+              --arg digest "${digest}" \
+              --argjson refs "${refs_json}" \
+              '{
+                name: $name,
+                digest: $digest,
+                references: $refs
+              }'
+          }
+
+          api_json="$(read_image_entry "api" "islamu-event-api")"
+          blazor_json="$(read_image_entry "blazor" "islamu-event-ui")"
+          migration_json="$(read_image_entry "migration" "islamu-event-migration-service")"
+          standalone_json="$(read_image_entry "standalone" "islamu-event-standalone")"
+
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg sourceCommitOid "${TARGET_COMMIT}" \
+            --argjson api "${api_json}" \
+            --argjson blazor "${blazor_json}" \
+            --argjson migration "${migration_json}" \
+            --argjson standalone "${standalone_json}" \
+            '{
+              schemaVersion: 1,
+              version: $version,
+              sourceCommitOid: $sourceCommitOid,
+              images: [$api, $blazor, $migration, $standalone]
+            }' | tee artifacts/release-staging/release-images.v1.json
+
+      - name: Provision verified git-cliff 2.14.2 and run offline prepare and seal-artifacts
+        id: prepare-seal
+        shell: bash
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+          TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+          TARGET_COMMIT: ${{ needs.preflight.outputs.target-commit }}
+          RELEASE_DIR: ${{ needs.preflight.outputs.release-dir }}
+        run: |
+          set -euo pipefail
+
+          release_proj="eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj"
+          dotnet restore "${release_proj}" --locked-mode --verbosity quiet
+          dotnet build "${release_proj}" --configuration Release --no-restore -m:1 -nr:false --verbosity quiet
+
+          dotnet run --project "${release_proj}" --configuration Release --no-build -- ensure-git-cliff
+          dotnet run --project "${release_proj}" --configuration Release --no-build -- verify-tools
+
+          dotnet run --project "${release_proj}" --configuration Release --no-build -- \
+            prepare "${RELEASE_DIR}" --image-manifest "artifacts/release-staging/release-images.v1.json"
+
+          sealed_dir="$(mktemp -d "${RUNNER_TEMP}/release-sealed-${VERSION}.XXXXXX")"
+
+          cp -- "${RELEASE_DIR}/contract-diff.v1.json" "${sealed_dir}/contract-diff.v1.json"
+          cp -- "${RELEASE_DIR}/release-context.v1.json" "${sealed_dir}/release-context.v1.json"
+          cp -- "artifacts/release-staging/release-images.v1.json" "${sealed_dir}/release-images.v1.json"
+          cp -- "${RELEASE_DIR}/release-notes.md" "${sealed_dir}/release-notes.md"
+          cp -- "${RELEASE_DIR}/release-rendering-context.v1.json" "${sealed_dir}/release-rendering-context.v1.json"
+
+          dotnet run --project "${release_proj}" --configuration Release --no-build -- \
+            seal-artifacts \
+            --directory "${sealed_dir}" \
+            --version "${VERSION}" \
+            --tag "${TAG_NAME}" \
+            --commit "${TARGET_COMMIT}"
+
+          (cd "${sealed_dir}" && sha256sum --check SHA256SUMS)
+          echo "sealed-dir=${sealed_dir}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Sealed Release Artifact Checksums"
+            echo
+            echo '```text'
+            cat "${sealed_dir}/SHA256SUMS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sealed release artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-sealed-${{ needs.preflight.outputs.version }}
+          overwrite: true
+          path: ${{ steps.prepare-seal.outputs.sealed-dir }}/*
+          if-no-files-found: error
+          retention-days: 90
+
+  sign-and-attest:
+    name: Attest Files And Cosign-Sign Every OCI Ref And Checksums
+    needs: [preflight, prepare-and-seal]
+    if: ${{ needs.preflight.outputs.should-publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Download sealed release artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-sealed-${{ needs.preflight.outputs.version }}
+          path: artifacts/release-sealed
+
+      - name: Verify sealed inventory and checksums before signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd artifacts/release-sealed && sha256sum --check SHA256SUMS)
+
+          expected_files="$(printf '%s\n' \
+            "SHA256SUMS" \
+            "contract-diff.v1.json" \
+            "release-artifact-manifest.v1.json" \
+            "release-context.v1.json" \
+            "release-images.v1.json" \
+            "release-notes.md" \
+            "release-rendering-context.v1.json" | LC_ALL=C sort)"
+          actual_files="$(find artifacts/release-sealed -maxdepth 1 -mindepth 1 -type f -printf '%f\n' | LC_ALL=C sort)"
+          if [[ "${actual_files}" != "${expected_files}" ]]; then
+            echo "Sealed artifact directory inventory mismatch before signing." >&2
+            exit 1
+          fi
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
+        with:
+          cosign-release: "v3.1.5"
+
+      - name: Log in to external container registry for OCI signature attachment
+        if: ${{ needs.preflight.outputs.secondary-registry != '' }}
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ needs.preflight.outputs.secondary-registry }}
+          username: ${{ needs.preflight.outputs.secondary-registry-login-user }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+
+      - name: Log in to GHCR for OCI signature attachment
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Attest sealed release file artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            artifacts/release-sealed/contract-diff.v1.json
+            artifacts/release-sealed/release-artifact-manifest.v1.json
+            artifacts/release-sealed/release-context.v1.json
+            artifacts/release-sealed/release-images.v1.json
+            artifacts/release-sealed/release-notes.md
+            artifacts/release-sealed/release-rendering-context.v1.json
+            artifacts/release-sealed/SHA256SUMS
+
+      - name: Cosign-sign and verify every canonical OCI digest reference
+        shell: bash
+        env:
+          TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+          EXPECTED_REFERENCE_COUNT: ${{ needs.preflight.outputs.expected-reference-count }}
+        run: |
+          set -euo pipefail
+          mapfile -t image_refs < <(jq -r '.images[].canonicalReferences[]' artifacts/release-sealed/release-artifact-manifest.v1.json)
+          if [[ "${#image_refs[@]}" -ne "${EXPECTED_REFERENCE_COUNT}" ]]; then
+            echo "Expected exactly ${EXPECTED_REFERENCE_COUNT} canonical OCI references to sign; found ${#image_refs[@]}." >&2
+            exit 1
+          fi
+
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${TAG_NAME}"
+          for ref in "${image_refs[@]}"; do
+            if [[ ! "${ref}" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[0-9]{1,5})?/[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*(/[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*)*@sha256:[0-9a-f]{64}$ ]]; then
+              echo "Refusing to sign non-canonical OCI reference: '${ref}'." >&2
+              exit 1
+            fi
+
+            cosign sign --yes "${ref}"
+            cosign verify \
+              --certificate-identity "${expected_identity}" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "${ref}"
+          done
+
+          {
+            echo "## Cosign OCI Signatures Verified (${#image_refs[@]} / ${EXPECTED_REFERENCE_COUNT})"
+            echo
+            for ref in "${image_refs[@]}"; do
+              echo "- \`${ref}\`"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cosign-sign and verify SHA256SUMS bundle
+        shell: bash
+        env:
+          TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+        run: |
+          set -euo pipefail
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${TAG_NAME}"
+
+          cosign sign-blob --yes \
+            --bundle artifacts/release-sealed/SHA256SUMS.sigstore.json \
+            artifacts/release-sealed/SHA256SUMS
+
+          cosign verify-blob \
+            --bundle artifacts/release-sealed/SHA256SUMS.sigstore.json \
+            --certificate-identity "${expected_identity}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            artifacts/release-sealed/SHA256SUMS
+
+      - name: Verify GitHub SLSA file attestations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+          TARGET_COMMIT: ${{ needs.preflight.outputs.target-commit }}
+        run: |
+          set -euo pipefail
+          for file in \
+            artifacts/release-sealed/contract-diff.v1.json \
+            artifacts/release-sealed/release-artifact-manifest.v1.json \
+            artifacts/release-sealed/release-context.v1.json \
+            artifacts/release-sealed/release-images.v1.json \
+            artifacts/release-sealed/release-notes.md \
+            artifacts/release-sealed/release-rendering-context.v1.json \
+            artifacts/release-sealed/SHA256SUMS; do
+            gh attestation verify "${file}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+              --source-ref "refs/tags/${TAG_NAME}" \
+              --source-digest "${TARGET_COMMIT}" \
+              --deny-self-hosted-runners
+          done
+
+      - name: Upload signed release bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-signed-${{ needs.preflight.outputs.version }}
+          overwrite: true
+          path: artifacts/release-sealed/*
+          if-no-files-found: error
+          retention-days: 90
+
+  publish-release:
+    name: Verify Draft And Publish Release Once
+    needs: [preflight, sign-and-attest]
+    if: ${{ needs.preflight.outputs.should-publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download signed release bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-signed-${{ needs.preflight.outputs.version }}
+          path: artifacts/release-signed
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
+        with:
+          cosign-release: "v3.1.5"
+
+      - name: Re-verify sealed checksums and Cosign bundle before GitHub Release creation
+        shell: bash
+        env:
+          TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+        run: |
+          set -euo pipefail
+          (cd artifacts/release-signed && sha256sum --check SHA256SUMS)
+
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${TAG_NAME}"
+          cosign verify-blob \
+            --bundle artifacts/release-signed/SHA256SUMS.sigstore.json \
+            --certificate-identity "${expected_identity}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            artifacts/release-signed/SHA256SUMS
+
+      - name: Create or resume draft release without clobbering, verify assets, and publish once
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+          TAG_OBJECT_ID: ${{ needs.preflight.outputs.tag-object-id }}
+          TARGET_COMMIT: ${{ needs.preflight.outputs.target-commit }}
+        run: |
+          set -euo pipefail
+
+          expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${TAG_NAME}"
+          expected_assets=(
+            "SHA256SUMS"
+            "SHA256SUMS.sigstore.json"
+            "contract-diff.v1.json"
+            "release-artifact-manifest.v1.json"
+            "release-context.v1.json"
+            "release-images.v1.json"
+            "release-notes.md"
+            "release-rendering-context.v1.json"
+          )
+          expected_sorted="$(printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort)"
+
+          verify_remote_tag_binding() {
+            local ref_json tag_json ref_type ref_sha tag_target_type tag_target_sha
+            ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG_NAME}")"
+            ref_type="$(printf '%s' "${ref_json}" | jq -r '.object.type')"
+            ref_sha="$(printf '%s' "${ref_json}" | jq -r '.object.sha')"
+            if [[ "${ref_type}" != "tag" || "${ref_sha}" != "${TAG_OBJECT_ID}" ]]; then
+              echo "Remote tag ref 'refs/tags/${TAG_NAME}' (type=${ref_type}, sha=${ref_sha}) no longer matches preflight-verified annotated tag object '${TAG_OBJECT_ID}'; failing closed." >&2
+              exit 1
+            fi
+
+            tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${TAG_OBJECT_ID}")"
+            tag_target_type="$(printf '%s' "${tag_json}" | jq -r '.object.type')"
+            tag_target_sha="$(printf '%s' "${tag_json}" | jq -r '.object.sha')"
+            if [[ "${tag_target_type}" != "commit" || "${tag_target_sha}" != "${TARGET_COMMIT}" ]]; then
+              echo "Annotated tag object '${TAG_OBJECT_ID}' target (type=${tag_target_type}, sha=${tag_target_sha}) does not match verified commit '${TARGET_COMMIT}'; failing closed." >&2
+              exit 1
+            fi
+          }
+
+          snapshot_release_assets() {
+            local release_json_file="$1"
+            jq -c '[.assets[] | {id, name, size, updated_at, digest: (.digest // "")}] | sort_by(.name)' "${release_json_file}"
+          }
+
+          verify_remote_tag_binding
+
+          releases_json="$(mktemp "${RUNNER_TEMP}/matching-releases.XXXXXX.json")"
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases" \
+            | jq --arg tag "${TAG_NAME}" '[.[][] | select(.tag_name == $tag)]' \
+            | tee "${releases_json}"
+
+          expected_prerelease="false"
+          prerelease_args=()
+          if [[ "${TAG_NAME}" == *-* ]]; then
+            expected_prerelease="true"
+            prerelease_args+=(--prerelease)
+          fi
+
+          published_count="$(jq '[.[] | select(.draft == false)] | length' "${releases_json}")"
+          draft_count="$(jq '[.[] | select(.draft == true)] | length' "${releases_json}")"
+
+          if [[ "${published_count}" -gt 1 ]] || [[ "${published_count}" -eq 1 && "${draft_count}" -gt 0 ]]; then
+            echo "Found ambiguous releases for ${TAG_NAME} (published=${published_count}, draft=${draft_count}); failing closed." >&2
+            exit 1
+          fi
+
+          if [[ "${published_count}" -eq 1 ]]; then
+            # On a failed-job retry after PATCH draft=false succeeded (for example if the immediate
+            # post-publish API call timed out), preflight outputs stay cached with should-publish=true.
+            # Never edit or replace the published release; verify every tag, flag, inventory, byte,
+            # checksum, and Cosign OIDC signature read-only and fail closed on any mismatch.
+            published_id="$(jq -r '[.[] | select(.draft == false)][0].id' "${releases_json}")"
+            existing_pub_json="$(mktemp "${RUNNER_TEMP}/published-retry-verify.XXXXXX.json")"
+            gh api "repos/${GITHUB_REPOSITORY}/releases/${published_id}" | tee "${existing_pub_json}" >/dev/null
+
+            if [[ "$(jq -r '.draft' "${existing_pub_json}")" != "false" || "$(jq -r '.tag_name' "${existing_pub_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${existing_pub_json}")" != "${expected_prerelease}" ]]; then
+              echo "Existing published release ID ${published_id} metadata does not match governed tag ${TAG_NAME} (expected prerelease=${expected_prerelease}); failing closed." >&2
+              exit 1
+            fi
+
+            actual_pub_assets="$(jq -r '.assets[].name' "${existing_pub_json}" | LC_ALL=C sort)"
+            if [[ "${actual_pub_assets}" != "${expected_sorted}" ]]; then
+              echo "Existing published release ${TAG_NAME} asset inventory mismatch; refusing to proceed." >&2
+              exit 1
+            fi
+
+            retry_verify_dir="$(mktemp -d "${RUNNER_TEMP}/published-retry-assets.XXXXXX")"
+            gh release download "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --dir "${retry_verify_dir}"
+            for asset in "${expected_assets[@]}"; do
+              if [[ "${asset}" == "SHA256SUMS.sigstore.json" ]]; then
+                continue
+              fi
+              if ! cmp -s -- "${retry_verify_dir}/${asset}" "artifacts/release-signed/${asset}"; then
+                echo "Existing published release asset '${asset}' differs from sealed bytes; failing closed." >&2
+                exit 1
+              fi
+            done
+            (cd "${retry_verify_dir}" && sha256sum --check SHA256SUMS)
+            cosign verify-blob \
+              --bundle "${retry_verify_dir}/SHA256SUMS.sigstore.json" \
+              --certificate-identity "${expected_identity}" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "${retry_verify_dir}/SHA256SUMS"
+            verify_remote_tag_binding
+
+            {
+              echo "## GitHub Release Verified (Already Published)"
+              echo
+              echo "Verified existing published release \`${TAG_NAME}\` (ID \`${published_id}\`, tag object \`${TAG_OBJECT_ID}\`, commit \`${TARGET_COMMIT}\`, prerelease \`${expected_prerelease}\`) read-only without modifying sealed assets."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ "${draft_count}" -gt 1 ]]; then
+            echo "Found ${draft_count} ambiguous draft releases for ${TAG_NAME}; failing closed." >&2
+            exit 1
+          fi
+
+          expected_bundle_path="artifacts/release-signed/SHA256SUMS.sigstore.json"
+          if [[ "${draft_count}" -eq 0 ]]; then
+            gh release create "${TAG_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --target "${TARGET_COMMIT}" \
+              --title "ISLAMU Event ${TAG_NAME}" \
+              --notes-file artifacts/release-signed/release-notes.md \
+              ${prerelease_args[@]+"${prerelease_args[@]}"}
+
+            draft_id=""
+            for _ in 1 2 3 4 5; do
+              draft_id="$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases" \
+                | jq -r --arg tag "${TAG_NAME}" '[.[][] | select(.tag_name == $tag and .draft == true)][0].id // empty')"
+              if [[ -n "${draft_id}" ]]; then
+                break
+              fi
+              sleep 2
+            done
+
+            if [[ -z "${draft_id}" ]]; then
+              echo "Could not resolve numeric draft release ID for ${TAG_NAME} after creation." >&2
+              exit 1
+            fi
+
+            for asset in "${expected_assets[@]}"; do
+              gh release upload "${TAG_NAME}" "artifacts/release-signed/${asset}" --repo "${GITHUB_REPOSITORY}"
+            done
+          else
+            draft_id="$(jq -r '.[0].id' "${releases_json}")"
+            draft_target="$(jq -r '.[0].target_commitish' "${releases_json}")"
+            draft_prerelease="$(jq -r '.[0].prerelease' "${releases_json}")"
+            if [[ "${draft_target}" != "${TARGET_COMMIT}" ]]; then
+              echo "Existing draft target_commitish '${draft_target}' does not match verified commit '${TARGET_COMMIT}'; refusing to reuse draft." >&2
+              exit 1
+            fi
+            if [[ "${draft_prerelease}" != "${expected_prerelease}" ]]; then
+              echo "Existing draft prerelease='${draft_prerelease}' does not match governed tag '${TAG_NAME}' (expected '${expected_prerelease}'); refusing to reuse draft." >&2
+              exit 1
+            fi
+
+            draft_verify_dir="$(mktemp -d "${RUNNER_TEMP}/draft-existing-assets.XXXXXX")"
+
+            mapfile -t existing_draft_assets < <(jq -r '.[0].assets[].name' "${releases_json}")
+            for existing_name in "${existing_draft_assets[@]}"; do
+              is_expected="false"
+              for allowed in "${expected_assets[@]}"; do
+                if [[ "${existing_name}" == "${allowed}" ]]; then
+                  is_expected="true"
+                  break
+                fi
+              done
+              if [[ "${is_expected}" != "true" ]]; then
+                echo "Unexpected asset '${existing_name}' found on existing draft ${TAG_NAME}; failing closed." >&2
+                exit 1
+              fi
+            done
+
+            for asset in "${expected_assets[@]}"; do
+              if jq -e --arg name "${asset}" '.[0].assets | any(.name == $name)' "${releases_json}"; then
+                gh release download "${TAG_NAME}" \
+                  --repo "${GITHUB_REPOSITORY}" \
+                  --pattern "${asset}" \
+                  --dir "${draft_verify_dir}"
+                if cmp -s -- "${draft_verify_dir}/${asset}" "artifacts/release-signed/${asset}"; then
+                  continue
+                fi
+
+                # On a full rerun after partial draft upload, Cosign keyless signing mints a fresh
+                # ephemeral bundle even for identical SHA256SUMS. Never clobber the draft asset:
+                # accept the existing draft bundle only if it cryptographically verifies SHA256SUMS
+                # under the exact expected workflow OIDC identity.
+                if [[ "${asset}" == "SHA256SUMS.sigstore.json" ]]; then
+                  cosign verify-blob \
+                    --bundle "${draft_verify_dir}/SHA256SUMS.sigstore.json" \
+                    --certificate-identity "${expected_identity}" \
+                    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+                    artifacts/release-signed/SHA256SUMS
+                  expected_bundle_path="${draft_verify_dir}/SHA256SUMS.sigstore.json"
+                  echo "Existing draft SHA256SUMS.sigstore.json passed independent Cosign OIDC verification; preserving existing bundle without clobbering."
+                else
+                  echo "Existing draft asset '${asset}' differs from newly sealed bytes; refusing to clobber." >&2
+                  exit 1
+                fi
+              else
+                gh release upload "${TAG_NAME}" "artifacts/release-signed/${asset}" --repo "${GITHUB_REPOSITORY}"
+              fi
+            done
+
+            gh release edit "${TAG_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --notes-file artifacts/release-signed/release-notes.md
+          fi
+
+          # Snapshot draft release state by numeric ID and verify exact round-trip bytes before publish.
+          draft_state_json="$(mktemp "${RUNNER_TEMP}/draft-before-publish.XXXXXX.json")"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${draft_state_json}"
+
+          if [[ "$(jq -r '.draft' "${draft_state_json}")" != "true" || "$(jq -r '.tag_name' "${draft_state_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${draft_state_json}")" != "${expected_prerelease}" ]]; then
+            echo "Expected release ID ${draft_id} (${TAG_NAME}) to remain a matching draft (prerelease=${expected_prerelease}) prior to final publication." >&2
+            exit 1
+          fi
+
+          actual_draft_assets="$(jq -r '.assets[].name' "${draft_state_json}" | LC_ALL=C sort)"
+          if [[ "${actual_draft_assets}" != "${expected_sorted}" ]]; then
+            echo "Draft release ${TAG_NAME} asset inventory mismatch prior to publication." >&2
+            exit 1
+          fi
+
+          verified_asset_snapshot="$(snapshot_release_assets "${draft_state_json}")"
+
+          roundtrip_dir="$(mktemp -d "${RUNNER_TEMP}/draft-roundtrip.XXXXXX")"
+          gh release download "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --dir "${roundtrip_dir}"
+          for asset in "${expected_assets[@]}"; do
+            expected_path="artifacts/release-signed/${asset}"
+            if [[ "${asset}" == "SHA256SUMS.sigstore.json" ]]; then
+              expected_path="${expected_bundle_path}"
+            fi
+            if ! cmp -s -- "${roundtrip_dir}/${asset}" "${expected_path}"; then
+              echo "Downloaded draft asset '${asset}' failed byte-for-byte verification before publication." >&2
+              exit 1
+            fi
+          done
+          (cd "${roundtrip_dir}" && sha256sum --check SHA256SUMS)
+          cosign verify-blob \
+            --bundle "${roundtrip_dir}/SHA256SUMS.sigstore.json" \
+            --certificate-identity "${expected_identity}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${roundtrip_dir}/SHA256SUMS"
+
+          # Re-verify tag object binding, draft tag/prerelease metadata, and exact draft asset identities immediately before publishing.
+          verify_remote_tag_binding
+          pre_publish_check_json="$(mktemp "${RUNNER_TEMP}/draft-pre-publish-check.XXXXXX.json")"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${pre_publish_check_json}" >/dev/null
+          if [[ "$(jq -r '.draft' "${pre_publish_check_json}")" != "true" || "$(jq -r '.tag_name' "${pre_publish_check_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${pre_publish_check_json}")" != "${expected_prerelease}" || "$(snapshot_release_assets "${pre_publish_check_json}")" != "${verified_asset_snapshot}" ]]; then
+            echo "Draft release ID ${draft_id} state, tag/prerelease metadata, or asset identities changed after round-trip verification; refusing to publish." >&2
+            exit 1
+          fi
+
+          # Publish once by exact numeric release ID with explicit prerelease flag after every asset, tag object, and signature is verified.
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" \
+            -F draft=false \
+            -F prerelease="${expected_prerelease}"
+
+          # Immediate post-publish verification to detect any race or authorized-editor mutation during the publish call.
+          verify_remote_tag_binding
+          post_publish_json="$(mktemp "${RUNNER_TEMP}/published-post-verify.XXXXXX.json")"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" | tee "${post_publish_json}" >/dev/null
+          if [[ "$(jq -r '.draft' "${post_publish_json}")" != "false" || "$(jq -r '.tag_name' "${post_publish_json}")" != "${TAG_NAME}" || "$(jq -r '.prerelease' "${post_publish_json}")" != "${expected_prerelease}" || "$(snapshot_release_assets "${post_publish_json}")" != "${verified_asset_snapshot}" ]]; then
+            echo "SECURITY ALERT: Published release ID ${draft_id} (${TAG_NAME}) asset identities, prerelease flag, or tag binding diverged from the pre-publish verified snapshot." >&2
+            exit 1
+          fi
+
+          post_publish_dir="$(mktemp -d "${RUNNER_TEMP}/published-roundtrip.XXXXXX")"
+          gh release download "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --dir "${post_publish_dir}"
+          for asset in "${expected_assets[@]}"; do
+            expected_path="artifacts/release-signed/${asset}"
+            if [[ "${asset}" == "SHA256SUMS.sigstore.json" ]]; then
+              expected_path="${expected_bundle_path}"
+            fi
+            if ! cmp -s -- "${post_publish_dir}/${asset}" "${expected_path}"; then
+              echo "SECURITY ALERT: Published release asset '${asset}' bytes diverged after publication." >&2
+              exit 1
+            fi
+          done
+          (cd "${post_publish_dir}" && sha256sum --check SHA256SUMS)
+          cosign verify-blob \
+            --bundle "${post_publish_dir}/SHA256SUMS.sigstore.json" \
+            --certificate-identity "${expected_identity}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${post_publish_dir}/SHA256SUMS"
+
+          {
+            echo "## GitHub Release Published"
+            echo
+            echo "Published and post-verified release \`${TAG_NAME}\` (ID \`${draft_id}\`, tag object \`${TAG_OBJECT_ID}\`, commit \`${TARGET_COMMIT}\`) with exact 8 sealed/signed assets."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  append-contributors:
+    name: Append Best-Effort Mutable Contributor Credit (Model 2)
+    needs: [preflight, publish-release]
+    if: ${{ needs.preflight.outputs.should-publish == 'true' && needs.publish-release.result == 'success' }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository with full tag history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Download signed release notes and context
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-signed-${{ needs.preflight.outputs.version }}
+          path: artifacts/release-signed
+
+      - name: Render optional online contributor section with verified git-cliff (--no-exec) and update mutable body
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+          TARGET_COMMIT: ${{ needs.preflight.outputs.target-commit }}
+        run: |
+          set -euo pipefail
+
+          release_proj="eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj"
+          dotnet restore "${release_proj}" --locked-mode --verbosity quiet
+          dotnet build "${release_proj}" --configuration Release --no-restore -m:1 -nr:false --verbosity quiet
+          dotnet run --project "${release_proj}" --configuration Release --no-build -- ensure-git-cliff
+          dotnet run --project "${release_proj}" --configuration Release --no-build -- verify-tools
+
+          git_cliff_bin="${HOME}/.cache/islamu-event/tools/git-cliff/2.14.2/linux-x64/git-cliff"
+          if [[ ! -x "${git_cliff_bin}" ]]; then
+            echo "Verified git-cliff binary not found; preserving identity-free release body."
+            exit 0
+          fi
+
+          previous_tag="$(jq -r '.release.previousPublishedTag // empty' artifacts/release-signed/release-context.v1.json)"
+          if [[ -n "${previous_tag}" ]] && git rev-parse --verify "refs/tags/${previous_tag}^{commit}" >/dev/null 2>&1; then
+            commit_range="${previous_tag}..${TARGET_COMMIT}"
+          else
+            commit_range="${TARGET_COMMIT}"
+          fi
+
+          contributors_file="$(mktemp "${RUNNER_TEMP}/contributors.XXXXXX.md")"
+          if ! "${git_cliff_bin}" \
+            --config eng/release/cliff-github-contributors.toml \
+            --no-exec \
+            --github-repo "${GITHUB_REPOSITORY}" \
+            --tag "${TAG_NAME}" \
+            --output "${contributors_file}" \
+            -- "${commit_range}"; then
+            echo "Online contributor projection failed; keeping signed identity-free release body unchanged."
+            exit 0
+          fi
+
+          if [[ ! -s "${contributors_file}" ]] || ! grep -q '^## Contributors$' "${contributors_file}"; then
+            echo "No contributor handles returned; keeping signed identity-free release body unchanged."
+            exit 0
+          fi
+
+          # Model 2 privacy invariant: never emit raw email addresses even in the mutable body.
+          if grep -Eq '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "${contributors_file}"; then
+            echo "Email address pattern detected in contributor projection; refusing to update release body." >&2
+            exit 1
+          fi
+
+          mutable_body="$(mktemp "${RUNNER_TEMP}/mutable-release-body.XXXXXX.md")"
+          {
+            cat artifacts/release-signed/release-notes.md
+            echo
+            echo "---"
+            echo
+            cat "${contributors_file}"
+            echo
+            echo "_Contributor acknowledgements appear only on this mutable GitHub Release page and are excluded from signed \`release-notes.md\` and \`SHA256SUMS\`. Contributors may request edits or removal at any time without invalidating release verification._"
+          } | tee "${mutable_body}" >/dev/null
+
+          gh release edit "${TAG_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --notes-file "${mutable_body}"
+
+          echo "Appended mutable Model 2 contributor credit to GitHub Release ${TAG_NAME} without modifying sealed assets." >> "$GITHUB_STEP_SUMMARY"

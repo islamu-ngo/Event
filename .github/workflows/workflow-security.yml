@@ -63,7 +63,7 @@ jobs:
           relevant_files=""
           while IFS= read -r changed_file; do
             case "$changed_file" in
-              .github/workflows/*|.ci/*|eng/dependency-submission/*|eng/release/*|.github/dependabot.yml|docs/internal/CI_CD_GOVERNANCE.md|src/Explore.API/Dockerfile|src/Explore.Blazor/Dockerfile|src/Event.Standalone/Dockerfile)
+              .github/workflows/*|.ci/*|eng/dependency-submission/*|eng/release/*|.github/dependabot.yml|docs/internal/CI_CD_GOVERNANCE.md|src/Explore.API/Dockerfile|src/Explore.Blazor/Dockerfile|src/Event.Standalone/Dockerfile|src/Event.MigrationService/Dockerfile)
                 relevant_files="${relevant_files}${changed_file}"$'\n'
                 ;;
             esac
@@ -97,7 +97,7 @@ jobs:
           set -euo pipefail
           dotnet run .ci/scripts/validate-action-pins.cs -- .github/workflows
           dotnet run .ci/scripts/validate-dependabot-policy.cs -- .github/dependabot.yml
-          dotnet run .ci/scripts/validate-dockerfile-base-images.cs -- src/Explore.API/Dockerfile src/Explore.Blazor/Dockerfile
+          dotnet run .ci/scripts/validate-dockerfile-base-images.cs -- src/Explore.API/Dockerfile src/Explore.Blazor/Dockerfile src/Event.Standalone/Dockerfile src/Event.MigrationService/Dockerfile
           dotnet run .ci/scripts/validate-workflow-cache-policy.cs -- .github/workflows
           dotnet run .ci/scripts/validate-deploy-workflow-contract.cs
 

@@ -38,14 +38,30 @@ public static class SyncPublicChangelogCommand
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
-    private sealed record ParsedOptions(Uri PublicationBase, string? AllowedSignersPath, bool Check);
+    private sealed record ParsedOptions(Uri PublicationBase, string? AllowedSignersPath, string? SealedArtifactsRoot, bool Check);
 
     private sealed record ChangelogPaths(
         string Root,
         string AllowedSignersPath,
+        string? SealedArtifactsRoot,
         string PagePath,
         string ManifestPath,
         string TransactionPath);
+
+    private sealed record LoadedGeneratedArtifacts(
+        byte[] ContextBytes,
+        byte[] NotesBytes,
+        IReadOnlyList<EnrichedImageReference>? Images,
+        bool NotesInSignedTagTree,
+        string? ManifestSha256);
+
+    private sealed record SignedReleaseLookup(
+        string RepositoryRoot,
+        string AllowedSignersPath,
+        string? SealedArtifactsRoot,
+        string ReleaseDir,
+        string VersionDir,
+        string TargetCommitOid);
 
     private sealed record LoadedPublicationState(
         byte[] PreviousPage,
@@ -81,47 +97,67 @@ public static class SyncPublicChangelogCommand
         }
     }
 
+    private sealed class OptionAccumulator
+    {
+        public Uri? PublicationBase { get; set; }
+        public string? AllowedSignersPath { get; set; }
+        public string? SealedArtifactsRoot { get; set; }
+        public bool Check { get; set; }
+    }
+
     private static bool TryParseArguments(string[] args, TextWriter output, out ParsedOptions? parsed)
     {
         parsed = null;
-        Uri? publicationBase = null;
-        string? allowedSignersPath = null;
-        bool check = false;
-
+        var options = new OptionAccumulator();
         var reader = new CliArgumentReader(args);
         while (reader.TryReadNext(out string token))
         {
-            if (token == "--check" && !check)
+            if (!TryApplyOption(token, ref reader, options, output))
             {
-                check = true;
-            }
-            else if (token == "--allowed-signers" && reader.TryReadOptionValue(allowedSignersPath, out string signers))
-            {
-                allowedSignersPath = signers;
-            }
-            else if (token == "--publication-base" && reader.TryReadOptionValue(publicationBase?.ToString(), out string baseText))
-            {
-                if (!Uri.TryCreate(baseText, UriKind.Absolute, out publicationBase))
-                {
-                    output.WriteLine("changelog_invalid_publication_base");
-                    return false;
-                }
-            }
-            else
-            {
-                output.WriteLine("changelog_invalid_arguments");
                 return false;
             }
         }
 
-        if (args.Length < 2 || args[0] != "sync-public-changelog" || publicationBase is null)
+        if (args.Length < 2 || args[0] != "sync-public-changelog" || options.PublicationBase is null)
         {
             output.WriteLine("changelog_required_arguments_missing");
             return false;
         }
 
-        parsed = new ParsedOptions(publicationBase, allowedSignersPath, check);
+        parsed = new ParsedOptions(options.PublicationBase, options.AllowedSignersPath, options.SealedArtifactsRoot, options.Check);
         return true;
+    }
+
+    private static bool TryApplyOption(
+        string token,
+        ref CliArgumentReader reader,
+        OptionAccumulator options,
+        TextWriter output)
+    {
+        switch (token)
+        {
+            case "--check" when !options.Check:
+                options.Check = true;
+                return true;
+            case "--allowed-signers" when reader.TryReadOptionValue(options.AllowedSignersPath, out string signers):
+                options.AllowedSignersPath = signers;
+                return true;
+            case "--sealed-artifacts-root" when reader.TryReadOptionValue(options.SealedArtifactsRoot, out string sealedRoot):
+                options.SealedArtifactsRoot = sealedRoot;
+                return true;
+            case "--publication-base" when reader.TryReadOptionValue(options.PublicationBase?.ToString(), out string baseText):
+                if (!Uri.TryCreate(baseText, UriKind.Absolute, out Uri? parsedBase))
+                {
+                    output.WriteLine("changelog_invalid_publication_base");
+                    return false;
+                }
+
+                options.PublicationBase = parsedBase;
+                return true;
+            default:
+                output.WriteLine("changelog_invalid_arguments");
+                return false;
+        }
     }
 
     private static int ExecuteSync(
@@ -130,7 +166,7 @@ public static class SyncPublicChangelogCommand
         string repositoryRoot,
         Action<string>? replacementCompleted)
     {
-        if (!TryResolveSafePaths(repositoryRoot, options.AllowedSignersPath, out ChangelogPaths paths))
+        if (!TryResolveSafePaths(repositoryRoot, options.AllowedSignersPath, options.SealedArtifactsRoot, out ChangelogPaths paths))
         {
             return Reject(output, Diagnostics.PathInvalid);
         }
@@ -141,7 +177,7 @@ public static class SyncPublicChangelogCommand
             return Reject(output, stateDiagnostic);
         }
 
-        if (!TryLoadSignedReleases(paths.Root, paths.AllowedSignersPath, out List<PublicChangelogRelease> releases, out string? loadDiagnostic))
+        if (!TryLoadSignedReleases(paths, out List<PublicChangelogRelease> releases, out string? loadDiagnostic))
         {
             return Reject(output, loadDiagnostic ?? "changelog_releases_invalid");
         }
@@ -185,16 +221,24 @@ public static class SyncPublicChangelogCommand
         return Program.Success;
     }
 
-    private static bool TryResolveSafePaths(string repositoryRoot, string? allowedSignersPath, out ChangelogPaths paths)
+    private static bool TryResolveSafePaths(
+        string repositoryRoot,
+        string? allowedSignersPath,
+        string? sealedArtifactsRoot,
+        out ChangelogPaths paths)
     {
         string root = Path.GetFullPath(repositoryRoot);
         string resolvedSigners = allowedSignersPath is not null
             ? Path.GetFullPath(allowedSignersPath)
             : GitTagSignatureVerifier.ResolveDefaultAllowedSignersPath(root);
+        string? resolvedSealedRoot = sealedArtifactsRoot is not null
+            ? Path.GetFullPath(sealedArtifactsRoot)
+            : null;
         string changelogDir = Path.Combine(root, "docs", "public", "changelog");
         paths = new ChangelogPaths(
             root,
             resolvedSigners,
+            resolvedSealedRoot,
             Path.Combine(changelogDir, "README.md"),
             Path.Combine(changelogDir, "publication-manifest.v1.json"),
             Path.Combine(changelogDir, ".publication-transaction.v1.json"));
@@ -202,7 +246,8 @@ public static class SyncPublicChangelogCommand
         return IsSafePath(paths.PagePath) &&
             IsSafePath(paths.ManifestPath) &&
             IsSafePath(paths.TransactionPath) &&
-            IsSafePath(paths.AllowedSignersPath);
+            IsSafePath(paths.AllowedSignersPath) &&
+            (paths.SealedArtifactsRoot is null || IsSafePath(paths.SealedArtifactsRoot));
     }
 
     private static string? TryLoadExistingState(ChangelogPaths paths, out LoadedPublicationState? state)
@@ -280,9 +325,7 @@ public static class SyncPublicChangelogCommand
             return null;
         }
 
-        byte[] emptyBootstrapPage = Utf8.GetBytes($"{PublicChangelogPolicy.StartMarker}\n{PublicChangelogPolicy.EndMarker}\n");
-        if (previousManifest.Length != 0 ||
-            (previousPage.Length != 0 && !previousPage.AsSpan().SequenceEqual(emptyBootstrapPage)))
+        if (previousManifest.Length != 0 || !PublicChangelogPolicy.IsEmptyBootstrapPage(previousPage))
         {
             return Diagnostics.AcceptedManifestMissing;
         }
@@ -407,15 +450,14 @@ public static class SyncPublicChangelogCommand
     }
 
     private static bool TryLoadSignedReleases(
-        string repositoryRoot,
-        string allowedSignersPath,
+        ChangelogPaths paths,
         out List<PublicChangelogRelease> releases,
         out string? diagnostic)
     {
         releases = [];
         diagnostic = null;
 
-        string releasesRoot = Path.Combine(repositoryRoot, "docs", "internal", "releases");
+        string releasesRoot = Path.Combine(paths.Root, "docs", "internal", "releases");
         if (!Directory.Exists(releasesRoot))
         {
             diagnostic = Diagnostics.ReleasesMissing;
@@ -432,10 +474,10 @@ public static class SyncPublicChangelogCommand
             return false;
         }
 
-        var objectReader = new GitProcessObjectReader(repositoryRoot, TimeSpan.FromSeconds(10), MaximumInputBytes);
+        var objectReader = new GitProcessObjectReader(paths.Root, TimeSpan.FromSeconds(10), MaximumInputBytes);
         foreach (string releaseDir in candidateDirs)
         {
-            if (!TryLoadSingleSignedRelease(repositoryRoot, allowedSignersPath, releaseDir, objectReader, out PublicChangelogRelease? release, out diagnostic))
+            if (!TryLoadSingleSignedRelease(paths, releaseDir, objectReader, out PublicChangelogRelease? release, out diagnostic))
             {
                 return false;
             }
@@ -447,8 +489,7 @@ public static class SyncPublicChangelogCommand
     }
 
     private static bool TryLoadSingleSignedRelease(
-        string repositoryRoot,
-        string allowedSignersPath,
+        ChangelogPaths paths,
         string releaseDir,
         IGitObjectReader objectReader,
         out PublicChangelogRelease? release,
@@ -463,39 +504,43 @@ public static class SyncPublicChangelogCommand
         }
 
         GitTagVerificationResult tagVerification = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
-            repositoryRoot,
+            paths.Root,
             $"v{versionDir}",
-            allowedSignersPath));
+            paths.AllowedSignersPath));
         if (!tagVerification.IsValid || tagVerification.TagObjectId is null || tagVerification.TargetCommitOid is null)
         {
             diagnostic = tagVerification.Diagnostic ?? "changelog_tag_invalid";
             return false;
         }
 
+        var lookup = new SignedReleaseLookup(paths.Root, paths.AllowedSignersPath, paths.SealedArtifactsRoot, releaseDir, versionDir, tagVerification.TargetCommitOid);
         string prefix = $"docs/internal/releases/{versionDir}";
-        if (!TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{prefix}/release.yaml", Diagnostics.ReleaseFilesMissing, out byte[] releaseBytes, out diagnostic) ||
-            !TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{prefix}/summary.md", Diagnostics.ReleaseFilesMissing, out byte[] summaryBytes, out diagnostic) ||
-            !TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{prefix}/release-context.v1.json", Diagnostics.ReleaseFilesMissing, out byte[] contextBytes, out diagnostic) ||
-            !TryReadSignedArtifact(objectReader, tagVerification.TargetCommitOid, repositoryRoot, $"{prefix}/release-notes.md", Diagnostics.ReleaseFilesMissing, out byte[] notesBytes, out diagnostic))
+        if (!TryReadSignedArtifact(objectReader, lookup.TargetCommitOid, lookup.RepositoryRoot, $"{prefix}/release.yaml", Diagnostics.ReleaseFilesMissing, out byte[] releaseBytes, out diagnostic) ||
+            !TryReadSignedArtifact(objectReader, lookup.TargetCommitOid, lookup.RepositoryRoot, $"{prefix}/summary.md", Diagnostics.ReleaseFilesMissing, out byte[] summaryBytes, out diagnostic))
         {
             return false;
         }
 
-        ArtifactPolicyResult notesPolicy = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(Utf8.GetString(notesBytes));
+        if (!TryLoadGeneratedArtifacts(objectReader, lookup, out LoadedGeneratedArtifacts? generated, out diagnostic))
+        {
+            return false;
+        }
+
+        ArtifactPolicyResult notesPolicy = ReleaseArtifactPolicy.ValidateRenderedReleaseNotes(Utf8.GetString(generated!.NotesBytes));
         if (!notesPolicy.IsValid)
         {
             diagnostic = notesPolicy.Diagnostics.Count == 0 ? "changelog_notes_invalid" : notesPolicy.Diagnostics[0];
             return false;
         }
 
-        ReleaseContext? context = JsonSerializer.Deserialize<ReleaseContext>(contextBytes, JsonOptions);
+        ReleaseContext? context = JsonSerializer.Deserialize<ReleaseContext>(generated.ContextBytes, JsonOptions);
         if (context is null)
         {
             diagnostic = "changelog_context_invalid";
             return false;
         }
 
-        if (!TryLoadSignedFragments(objectReader, tagVerification.TargetCommitOid, repositoryRoot, context, out List<string> fragmentYamls, out diagnostic))
+        if (!TryLoadSignedFragments(objectReader, lookup.TargetCommitOid, lookup.RepositoryRoot, context, out List<string> fragmentYamls, out diagnostic))
         {
             return false;
         }
@@ -514,15 +559,109 @@ public static class SyncPublicChangelogCommand
             return false;
         }
 
+        if (!generated.NotesInSignedTagTree && !ContextMatchesDescriptor(context, validated.Descriptor))
+        {
+            diagnostic = "changelog_context_descriptor_mismatch";
+            return false;
+        }
+
         release = new PublicChangelogRelease(
             validated.Descriptor,
             context,
             validated.Fragments,
             Utf8.GetString(summaryBytes).TrimEnd('\n'),
-            Digest(notesBytes),
+            Digest(generated.NotesBytes),
             tagVerification.TagObjectId,
-            tagVerification.TargetCommitOid);
+            tagVerification.TargetCommitOid,
+            generated.Images,
+            generated.NotesInSignedTagTree,
+            generated.ManifestSha256);
         return true;
+    }
+
+    private static bool TryLoadGeneratedArtifacts(
+        IGitObjectReader objectReader,
+        SignedReleaseLookup lookup,
+        out LoadedGeneratedArtifacts? loaded,
+        out string? diagnostic)
+    {
+        loaded = null;
+        string prefix = $"docs/internal/releases/{lookup.VersionDir}";
+        string contextRelative = $"{prefix}/{ReleaseArtifactManifest.ReleaseContextFileName}";
+        string notesRelative = $"{prefix}/{ReleaseArtifactManifest.ReleaseNotesFileName}";
+
+        GitBlobReadResult taggedContext = objectReader.ReadBlob(lookup.TargetCommitOid, contextRelative);
+        if (taggedContext.Diagnostic is not null)
+        {
+            diagnostic = taggedContext.Diagnostic;
+            return false;
+        }
+
+        GitBlobReadResult taggedNotes = objectReader.ReadBlob(lookup.TargetCommitOid, notesRelative);
+        if (taggedNotes.Diagnostic is not null)
+        {
+            diagnostic = taggedNotes.Diagnostic;
+            return false;
+        }
+
+        if (taggedContext.Found && taggedNotes.Found)
+        {
+            if (!TryReadSignedArtifact(objectReader, lookup.TargetCommitOid, lookup.RepositoryRoot, contextRelative, Diagnostics.ReleaseFilesMissing, out byte[] contextBytes, out diagnostic) ||
+                !TryReadSignedArtifact(objectReader, lookup.TargetCommitOid, lookup.RepositoryRoot, notesRelative, Diagnostics.ReleaseFilesMissing, out byte[] notesBytes, out diagnostic))
+            {
+                return false;
+            }
+
+            loaded = new LoadedGeneratedArtifacts(contextBytes, notesBytes, Images: null, NotesInSignedTagTree: true, ManifestSha256: null);
+            return true;
+        }
+
+        if (taggedContext.Found != taggedNotes.Found)
+        {
+            diagnostic = $"changelog_signed_artifact_missing:{(taggedContext.Found ? notesRelative : contextRelative)}";
+            return false;
+        }
+
+        string sealedDir = lookup.SealedArtifactsRoot is not null
+            ? Path.Combine(lookup.SealedArtifactsRoot, lookup.VersionDir)
+            : lookup.ReleaseDir;
+        if (!IsSafePath(sealedDir))
+        {
+            diagnostic = Diagnostics.PathInvalid;
+            return false;
+        }
+
+        ReleaseArtifactVerificationResult verified = ReleaseArtifactManifest.VerifySealedDirectory(
+            sealedDir,
+            lookup.VersionDir,
+            $"v{lookup.VersionDir}",
+            lookup.TargetCommitOid,
+            allowedSignersPath: lookup.AllowedSignersPath);
+        if (!verified.IsValid || verified.Manifest is null || verified.ContextBytes is null || verified.NotesBytes is null)
+        {
+            diagnostic = verified.Diagnostic ?? Diagnostics.ReleaseFilesMissing;
+            return false;
+        }
+
+        loaded = new LoadedGeneratedArtifacts(
+            verified.ContextBytes,
+            verified.NotesBytes,
+            verified.Manifest.Images,
+            NotesInSignedTagTree: false,
+            verified.ManifestSha256);
+        diagnostic = null;
+        return true;
+    }
+
+    private static bool ContextMatchesDescriptor(ReleaseContext context, ReleaseDescriptor descriptor)
+    {
+        string expectedDate = descriptor.ReleaseDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        return string.Equals(context.Release.Line, descriptor.Line, StringComparison.Ordinal) &&
+            string.Equals(context.Release.ReleaseDate, expectedDate, StringComparison.Ordinal) &&
+            string.Equals(context.Release.BaseStableTag, descriptor.BaseStableTag, StringComparison.Ordinal) &&
+            string.Equals(context.Release.PreviousPublishedTag, descriptor.PreviousPublishedTag, StringComparison.Ordinal) &&
+            string.Equals(context.Evidence?.BaseStableOid, descriptor.ReleaseRange.BaseOid, StringComparison.Ordinal) &&
+            string.Equals(context.Evidence?.PreviousPublishedOid, descriptor.ReleaseRange.PreviousOid, StringComparison.Ordinal);
     }
 
     private static bool TryLoadSignedFragments(

@@ -31,6 +31,42 @@ dependent scope per programme is the default; independent programmes may proceed
 in parallel. Cooperative ownership is not an atomic lock. Conflicting owners stop
 duplicate work and resolve ownership before editing the same scope.
 
+## PR Sizing Default And Anti-Over-Splitting
+
+Multi-PR execution exists to prevent **genuinely multi-week, long-lived branches**,
+not to force every implementation plan into several pull requests. Default to the
+fewest pull requests that keep delivery reviewable and safe:
+
+1. **1 multi-phase PR (default, Shape S):** Use a single pull request structured
+   into reviewable phases with atomic Conventional Commits for a cohesive feature,
+   refactor, bug fix, or isolated subsystem/tooling change. Not every plan needs
+   multiple PRs.
+2. **2 multi-phase PRs (normal ceiling, Shape M):** Split into two pull requests
+   only when the work divides cleanly along one real boundary—such as risk or
+   trust isolation (offline tooling vs. supply-chain/release pipeline), contract
+   stabilization (backend/OpenAPI foundation vs. generated client/UI consumer), or
+   a distinct verification/approval gate.
+3. **3+ PRs (exceptional, explicit justification required):** Reserve three or
+   more pull requests for genuinely multi-week or cross-surface programmes where a
+   1–2 PR branch would drift or mix unrelated release risks (for example:
+   multi-provider schema/migrations + public API contract + BFF/UI + rollout/ops
+   with independent review or deployability). State the concrete justification in
+   `plan.md` §0; never split merely to hit a Plane budget or because sub-steps can
+   theoretically compile alone.
+
+**Anti-Over-Splitting Rule:** Never manufacture an extra PR boundary when splitting
+would:
+
+- turn phases, small helper layers, single CLI commands, or an isolated project
+  with a fast test loop into tiny serial PRs;
+- merge unused/dead interfaces, unconsumed ports, or half-wired commands onto
+  `develop` waiting for a later PR to wire them;
+- create throwaway transitional refactors, temporary test patches, or duplicate
+  documentation rewrites solely to bridge an intermediate PR; or
+- multiply serial merge, worktree, reconciliation, and Plane tracking overhead
+  when atomic phase commits inside 1–2 PRs already give clean commit-by-commit
+  reviewability.
+
 ## Required Scope Definition
 
 In the canonical plan, group phases under each stable PR ID and state:
@@ -42,9 +78,12 @@ In the canonical plan, group phases under each stable PR ID and state:
 - Shared architecture, security/privacy boundaries and downstream obligations.
 
 Detail the next candidate enough to execute; retain later required outcomes,
-dependencies and acceptance in the same triad with rolling detail. A large PR
-renamed as a scope fails readiness if smaller independently mergeable outcomes
-exist. Do not move requested work to backlog to meet a sizing threshold.
+dependencies and acceptance in the same triad with rolling detail. Both extremes
+fail readiness: a genuine multi-week mega-PR disguised as one scope when concrete
+architectural, risk, or rollout boundaries justify splitting, and an over-split
+plan that fragments a 1–2 PR effort into 3+ serial PRs leaving unwired code or
+throwaway transitional work. Do not move requested work to backlog to meet a sizing
+threshold.
 
 The tasks registry records these mutable fields for every scope:
 

@@ -185,8 +185,11 @@ delegation, review or finalization before selecting a new Planned candidate; mar
 Ready only after merged/reconciled prerequisites and complete contracts are verified.
 Do not automatically load the whole triad or choose topology from historical checkboxes.
 
-The hierarchy is programme → PR scope → phase → task. The complete canonical triad
-stays in the main checkout across PRs. One delegated execution copy owns only the
+The hierarchy is programme → PR scope → phase → task. Default to 1 multi-phase PR
+(or 2 PRs along one concrete risk, trust, or contract boundary); reserve 3+ PRs
+for genuinely multi-week or cross-surface programmes with explicit justification
+([PR sizing default](skills/implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting)).
+The complete canonical triad stays in the main checkout across PRs. One delegated execution copy owns only the
 selected PR's live detailed ledger; the canonical selected checklist is a labelled
 snapshot. Explicit in-tree execution keeps that selected canonical section live.
 Extraction must include relevant shared invariants, scenarios, I-VSD constraints,

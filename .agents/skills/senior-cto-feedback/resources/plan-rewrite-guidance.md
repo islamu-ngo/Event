@@ -248,13 +248,17 @@ Docs:
 - Update `<doc files>`.
 ```
 
-## Multi-PR Delivery Guidance
+## PR Sizing And Multi-PR Delivery Guidance
 
-A multiphase plan is not automatically a single PR, and a phase is never a PR. When right-sizing finds separable, independently mergeable outcomes, give each a stable PR scope ID inside the same programme triad, with explicit prerequisites and readiness conditions, and update the Plane Tracking Plan to one item per PR. Keep together changes whose separate merge would leave contradictory or unusable intermediate states, and record why.
+Not every multiphase plan should be multi-PR, and a phase is never a PR. Follow the [PR sizing default](../../implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting): **default to 1 multi-phase PR**, use **2 multi-phase PRs** when a clear trust, contract, or surface boundary exists, and reserve **3+ PRs** for genuinely multi-week or cross-surface programmes where 1–2 PRs would cause long-lived branch drift or mix unrelated release risks.
 
-The following are possible PR scopes inside one programme, not separate
-workstreams or instructions to remove later scope. Use boundaries appropriate
-to the target and keep source/caller/test/docs slices coherent:
+Reviewers must apply right-sizing in **both directions**:
+- **Split** a genuine multi-week mega-PR into stable PR scopes inside the same programme triad with prerequisites, readiness conditions, and one Plane item per PR.
+- **Consolidate** an over-split 3–5 PR plan back into 1–2 multi-phase PRs (keeping atomic phase commits) whenever intermediate PRs turn phases into serial PRs, merge unwired interfaces/commands, or create throwaway transitional patches and duplicate doc churn.
+
+Keep together changes whose separate merge would leave contradictory, unwired, or unusable intermediate states, and record why.
+
+The following 4-scope pattern is an example **only for large, multi-week, cross-layer platform programmes** (database + API + client + ops)—never a mandatory template for single-project, tooling, or focused feature workstreams:
 
 
 1. PR-FOUNDATION — data/foundation
@@ -293,7 +297,7 @@ Audit plan §0 **Plane Tracking Plan** and `event/work/active-<task-slug>.yaml` 
 - **Fail flooding:** an item per phase, test, doc, review, verification gate or commit; more than `6` new items or a new Epic without the user's approval.
 - **Fail under-tracking:** several separately merged PRs under one item without Sub-items, two providers or capabilities in one item, or substantial work with no item.
 - **Check:** an existing item was searched for and reused where one fits; every new item has `parent:` = the right capability Epic UUID, Surface + Domain labels (not the retiring `Docs` label), `priority` as functional criticality, a Version Module, `state: Backlog`, no `assignees:`, and `id:` omitted while unpushed; Sub-items are listed in the plan, not yet in YAML; each PR scope names its item; no commit or PR logs sit in `description:`.
-- **Right-sizing changes:** when the number of merged PRs changes, update the Tracking Plan to match (an S plan that becomes multi-PR turns into a parent plus Sub-items).
+- **Right-sizing changes:** when the number of merged PRs changes in either direction, update the Tracking Plan to match (an S plan split into 2+ PRs becomes a parent plus Sub-items; an over-split multi-PR plan consolidated to 1 PR becomes a single S item, or consolidated to 2 PRs shrinks to 1 parent plus 2 Sub-items).
 - Rewrite a wrong Tracking Plan in place. On `Applied & Aligned`, set the active item to `state: Ready` in YAML (local only; execution pushes it). This marks plan readiness for tracking only; individual PR scopes still become Ready only through their own readiness check.
 
 ## Test-First Invariant Rewrite Pattern (for `tasks.md`)

@@ -1,7 +1,7 @@
 # AGENTS.md — Agent Contribution Contract
 
 > **This is the required entrypoint for every AI tool contributing to this repository.**
-> Last Updated: 2026-11-14
+> Last Updated: 2026-11-24
 
 ---
 
@@ -120,8 +120,13 @@ Every change must answer these eight questions **before editing any file**:
 
 ### Persistent Programmes And Bounded PR Execution
 
-The hierarchy is programme → PR scope → phase → task. Keep the complete canonical
-`dev/active/<programme>/` triad in the main checkout across all PRs. Planning owns
+The hierarchy is programme → PR scope → phase → task. **Not every plan should be
+multi-PR:** default to 1 multi-phase PR (or 2 PRs along a concrete risk, trust, or
+contract boundary) with atomic phase commits; reserve 3+ PRs only for genuinely
+multi-week or cross-surface programmes with explicit justification, and never split
+phases into unnecessary serial PRs that merge unwired code or throwaway interim
+work. Keep the complete canonical `dev/active/<programme>/` triad in the main
+checkout across all PRs. Planning owns
 the full requested scope; the tasks registry owns explicit delegation, delivery,
 reconciliation and cleanup facts. One delegated PR has one live detailed execution
 ledger; its canonical selected section is a labelled snapshot. Explicit user-selected

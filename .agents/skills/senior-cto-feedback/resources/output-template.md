@@ -26,7 +26,7 @@ The finishing chat response must follow this structure:
 ### Key Decisions Made
 - **[Decision 1 — e.g. Architectural Boundary]**: [Decision summary, e.g., Enforced server-side HAL link affordances and moved validation out of Blazor UI into CQRS command pipeline.]
 - **[Decision 2 — e.g. Breaking Change / Simplification]**: [Eliminated deprecated route aliases and legacy adapter shims in favor of clean V1 contracts.]
-- **[Decision 3 — Sequencing / Right-Sizing]**: [Retained all requested capabilities in the same programme; organized them into stable, independently mergeable PR scopes (e.g. PR-FOUNDATION, PR-CLIENT) with readiness conditions and per-PR acceptance gates.]
+- **[Decision 3 — Sequencing / Right-Sizing]**: [Retained all requested capabilities in the same programme; kept within 1–2 multi-phase PRs with atomic phase commits (or split/consolidated scopes with concrete rationale, readiness conditions, and per-PR acceptance gates).]
 - **[Decision 4 — e.g. Invariant Verification]**: [Mandated failing Red-phase tests for concurrency race on order capture before handler implementation.]
 
 ---
@@ -51,7 +51,7 @@ The finishing chat response must follow this structure:
 - **Test-First Invariant Ordering**: [Restructured tasks into explicit Task N.1 Red Phase (failing tests) -> Task N.2 Green Phase (handler) -> Task N.3 Refactor]
 - **Anti-Tautology**: [Replaced shallow mock assertions with domain invariant and contract assertions]
 - **Atomic Commit Contracts**: [Authored complete Conventional Commit packets for every phase, with path-limited git commands and benefit-led titles]
-- **PR Registry & Right-Sizing**: [Preserved all requested outcomes; registry lists every scope; divided oversized increments into dependency-ordered PR scopes without moving required work to backlog.]
+- **PR Registry & Right-Sizing**: [Preserved all requested outcomes; registry lists every scope; right-sized to 1–2 multi-phase PRs by default (splitting only genuine multi-week/cross-surface risks and consolidating over-split serial PRs) without moving required work to backlog.]
 
 ---
 

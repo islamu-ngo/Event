@@ -107,10 +107,10 @@ Do not convert a search miss into proof of absence without recording what was se
 
 Design the future state only after the evidence report is complete. Follow repository layer ownership and prefer reviewable vertical slices over layer-wide mega-phases.
 
-First divide the complete request into PR scopes under the [PR scope contract](pr-scope-contract.md#required-scope-definition):
+First divide the complete request into PR scopes under the [PR scope contract](pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting):
 
-- Give each scope a stable ID (`PR-<OUTCOME>`) and an independently usable, independently mergeable outcome. A single coherent change is a one-scope programme.
-- Split when smaller independently mergeable outcomes exist; keep together changes whose separate merge would leave contradictory or unusable intermediate states, and say why.
+- **Default to 1–2 multi-phase PRs:** Start with a single multi-phase PR (Shape S) using atomic phase commits. Split to 2 PRs only when one clear risk, trust, contract, or surface boundary exists. Use 3+ PRs only for genuinely multi-week or multi-surface programmes and record the concrete justification in §0.
+- Give each scope a stable ID (`PR-<OUTCOME>`) and an independently usable, independently mergeable outcome. Keep together changes whose separate merge would leave unwired ports/commands, throwaway transitional refactors/test patches, duplicate doc churn, or contradictory intermediate states—and say why.
 - Order scopes by consumed contracts. Each names its predecessors, the merged contracts it consumes or changes, and the readiness conditions that must hold before it can become Ready.
 - Detail the next candidate fully. Later scopes keep rolling detail: required outcomes, scenarios, dependencies, acceptance and I-VSD IDs stay in the same triad even when tasks are still coarse.
 - Never move requested work to backlog to meet a sizing threshold.

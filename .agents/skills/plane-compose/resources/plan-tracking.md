@@ -26,7 +26,7 @@ A plan that merges several PRs stays **one programme with one canonical triad** 
 
 ## Stage 1 — Planning (`implementation-plan`): local files only
 
-1. **Shape:** count the independently mergeable PR scopes in the plan's PR registry and classify it as trivial / S / M / L. Size PRs by reviewable outcome first, then map them to items; do not reshape PRs to fit the budget.
+1. **Shape:** size PR scopes first under the [PR sizing default](../../implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting) (default to 1 multi-phase PR / Shape S, or 2 PRs along a real risk/contract boundary; use 3+ PRs only for genuinely multi-week or multi-surface programmes with explicit justification), then count the PR scopes in the plan's registry and classify as trivial / S / M / L. Do not reshape PRs to fit or fill the Plane budget.
 2. **Deduplicate:** `rg -n -i '<keyword>' event/work/*.yaml`, then Plane MCP `workitem list` with `pql: title ~ "<keyword>"` and `fields: sequence_id,name,state,parent`. If an item already describes the outcome, bind the plan to it (step 5) instead of creating one.
 3. **Parent Epic:** pick the matching capability Epic from the project reference. Every new non-Epic item gets `parent: <Epic UUID>`.
 4. **New item:** copy `event/templates/active-workitem.yaml` to `event/work/active-<task>.yaml` holding only the S item or the M parent: `id:` omitted, `state: Backlog`, no `assignees:`, Surface + Domain labels, `priority` = functional criticality. Do **not** write Sub-items yet: their `parent:` needs the parent's UUID, which exists only after the first push.

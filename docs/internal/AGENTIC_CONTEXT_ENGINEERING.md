@@ -5,7 +5,7 @@
 
 > **Audience:** Contributors | AI Agents | Platform Architects | Maintainers  
 > **Status:** Authored policy. The multi-PR programme lifecycle (Sections 2 and 5) is documented here and in its owning skill resources; it hasn't yet been exercised end to end as an operational pilot, so treat runtime behavior as unproven until a pilot records evidence.
-> **Last Updated:** 2026-11-14 Europe/Brussels<br>
+> **Last Updated:** 2026-11-24 Europe/Brussels<br>
 > **Source Anchors:** [`AGENTS.md`](../../AGENTS.md), [`pr-scope-contract`](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md), [`pr-execution-lifecycle`](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md), [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md), [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml), [`implementation-plan`](../../.agents/skills/implementation-plan/SKILL.md), [`senior-cto-feedback`](../../.agents/skills/senior-cto-feedback/SKILL.md), [`implement-tasks`](../../.agents/skills/implement-tasks/SKILL.md), [`conventional-commit`](../../.agents/skills/conventional-commit/SKILL.md), [`plan-tracking`](../../.agents/skills/plane-compose/resources/plan-tracking.md), [`i-vsd`](../../.agents/skills/i-vsd/SKILL.md), [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md)
 
 ---
@@ -22,7 +22,7 @@ This system enforces six core design tenets:
 2. **Zero-Turn Structural Injection**: When graph tooling is available, pre-flight blast-radius slices reduce manual traversal by injecting callers, callees, impacted flows, and tests on Turn 1.
 3. **Behavior-Bound Test-First Invariants**: Requirements are written as observable system behavior (RFC 2119 + `WHEN`/`THEN` Scenarios) and mapped directly to failing Red tests at pre-agreed public seams *before* production code is touched.
 4. **Portable Root Contract With A Scoped Twin Pair**: `AGENTS.md` is the portable authority. Reciprocal path-rule twins currently cover only `.agents/rules` and `.omo/rules`; Claude, Cursor, Copilot, Gemini, and other harness adapters remain separate drift-prone integration surfaces.
-5. **Phase-Atomic Declarative Git Delivery**: Planning pre-authors a self-sufficient phase packet containing exact commit metadata, wholly owned paths, inspection/staging/path-limited commit commands, and post-commit verification. A programme is split into independently mergeable PR scopes; each selected scope runs on its own branch (`feat/EVENT-<item>-<programme>-<scope>`) in an isolated worktree (`.worktrees/<programme>--<scope>`) or, on explicit user mandate, in the current checkout. Every verified phase closes atomically with literal commit paths without recording commit hashes in markdown (the Git commit log is the single source of truth).
+5. **Phase-Atomic Declarative Git Delivery**: Planning pre-authors a self-sufficient phase packet containing exact commit metadata, wholly owned paths, inspection/staging/path-limited commit commands, and post-commit verification. A programme **defaults to 1 multi-phase PR** (or **2 PRs** along a concrete risk, trust, or contract boundary); it splits into 3+ PR scopes only for genuinely multi-week or multi-surface programmes with explicit justification ([PR sizing default](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting)). Each selected scope runs on its own branch (`feat/EVENT-<item>-<programme>-<scope>`) in an isolated worktree (`.worktrees/<programme>--<scope>`) or, on explicit user mandate, in the current checkout. Every verified phase closes atomically with literal commit paths without recording commit hashes in markdown (the Git commit log is the single source of truth).
 6. **Self-Contained Human Interaction & Zero Plan-Opening UX**: Prompts, feedback requests, milestone reports, and approval inquiries must be completely self-contained. The active implementation plan (`dev/active/<task>/`) is internal machine working memory, not the developer console. Agents must never force developers to open plan files to understand bare IDs (e.g. *"P04/P06 with P03 gates open"*); all decisions must be presented as inline, actionable Decision Briefs.
 
 ```mermaid
@@ -96,7 +96,7 @@ flowchart TD
 
     subgraph Stage3["Stage 3: Adversarial CTO Audit & Socratic Stress-Test (User-Invoked)"]
         DevDocTriadInit --> CTOTrigger["User Prompt:\n'Run senior-cto-feedback'"]
-        CTOTrigger --> CTOSkill["senior-cto-feedback Skill\n• Audits & Directly Refines Triad In-Place (Zero Review Files)\n• Audits Plane Tracking Plan (no flooding, no under-tracking)\n• Sets active-<task>.yaml state to Ready on approval (local)\n• 3D Scorecard (Completeness, Correctness, Coherence)\n• 4-Point Right-Sizing Check (Split PR Heuristic)\n• 'Worst Break' Catastrophic Invariant Check\n• Validates Declarative Per-Phase Commit Contracts\n• High-Signal Chat Summary"]
+        CTOTrigger --> CTOSkill["senior-cto-feedback Skill\n• Audits & Directly Refines Triad In-Place (Zero Review Files)\n• Audits Plane Tracking Plan (no flooding, no under-tracking)\n• Sets active-<task>.yaml state to Ready on approval (local)\n• 3D Scorecard (Completeness, Correctness, Coherence)\n• Balanced Right-Sizing Check (1–2 PR Default; Split or Consolidate)\n• 'Worst Break' Catastrophic Invariant Check\n• Validates Declarative Per-Phase Commit Contracts\n• High-Signal Chat Summary"]
     end
 
     subgraph Stage4["Stage 4: Implementation Execution & Autonomous Domain Guardrails"]
@@ -311,7 +311,7 @@ stateDiagram-v2
 
 ### Programme, PR Scope, Phase And Task Hierarchy
 
-The canonical unit is the **root programme** in `dev/active/<programme>/`. It contains **independently mergeable PR scopes** with stable IDs such as `PR-FOUNDATION`; each scope contains **phases**; each phase contains **tasks** and its verified commit packets. A phase, session or commit is never a PR. The [PR scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md) owns the registry fields and readiness rules, and the [PR execution lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md) owns execution, reconciliation, cleanup and recovery. This section only summarizes them.
+The canonical unit is the **root programme** in `dev/active/<programme>/`. It contains one or more **independently mergeable PR scopes** with stable IDs such as `PR-FOUNDATION`; each scope contains **phases**; each phase contains **tasks** and its verified commit packets. **Not every plan should be multi-PR:** default to **1 multi-phase PR** (or **2 PRs** when a clear trust, contract, or surface boundary exists), and reserve **3+ PRs** for genuinely multi-week or cross-surface programmes with an explicit justification in `plan.md` §0. A phase, session, helper layer, or commit is never a PR. The [PR scope contract](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting) owns the sizing default, anti-over-splitting rule, registry fields, and readiness rules, and the [PR execution lifecycle](../../.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md) owns execution, reconciliation, cleanup and recovery. This section only summarizes them.
 
 - **One live ledger per delegated scope.** The scoped execution copy is the live detailed ledger. The canonical selected checklist becomes a marked **delegated snapshot** naming its owner and location. On an explicit in-tree user mandate, the canonical section stays live and no copy is made.
 - **Selection.** Resume an existing Implementing or In review scope, or its pending finalization, first. Otherwise evaluate the earliest Planned candidate whose required predecessors are merged and reconciled, and mark it Ready only when its readiness conditions hold. A missing worktree triggers recovery, never recreation. Old checked tasks never choose topology or prove delivery.
@@ -408,8 +408,8 @@ Plane is useful only when its board matches how work actually merges. Flooding i
 | Plan shape | Pull requests | Plane items the plan owns |
 |---|---|---|
 | Trivial (typo, link fix, one-line config) | 1 | `0` (the commit uses `Changelog: skip`; no item) |
-| **S** — one capability | 1 | `1` Work Item under the capability Epic |
-| **M** — one capability, several PRs | 2–5 | `1` parent Work Item (no branch of its own) + `1` Sub-item per PR |
+| **S** — one capability (default) | 1 (multi-phase) | `1` Work Item under the capability Epic |
+| **M** — one capability, split along a real boundary | 2 (normal cap; 3–5 only with multi-week/cross-surface justification) | `1` parent Work Item (no branch of its own) + `1` Sub-item per PR |
 | **L** — a program of capabilities | many | one S or M Work Item per capability under an **existing** Epic; still one canonical programme triad |
 
 - **Budget**: more than `6` new items, or a new Epic, needs the user's approval in the plan's Decision Brief.
@@ -592,7 +592,7 @@ Representative `tasks.md` declarative commit contract:
 
 #### 5. PR Scope Boundaries & Mid-Flight Re-Scoping
 
-- **Planned Boundaries**: Planning splits the programme into independently mergeable PR scopes (for example *PR-FOUNDATION*, *PR-CORE-DOMAIN*, *PR-CONSUMERS* for a large migration). A large PR renamed as a scope fails readiness when smaller independently mergeable outcomes exist.
+- **Planned Boundaries (1–2 PR Default)**: Planning defaults to **1 multi-phase PR** (or **2 PRs** along one concrete risk, trust, or contract boundary) with atomic phase commits. Reserve 3+ PR scopes (for example *PR-FOUNDATION*, *PR-CORE-DOMAIN*, *PR-CONSUMERS*) strictly for genuinely multi-week or cross-surface migrations with explicit justification. Both extremes fail readiness: a multi-week mega-PR disguised as one scope, and an over-split 3+ PR chain that turns phases into serial PRs, merges unwired ports/commands, or introduces throwaway transitional work ([PR sizing default](../../.agents/skills/implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting)).
 - **Mid-Flight Re-Scoping**: If execution shows the selected scope is too large, propose a split via a Decision Brief. Verified phases can ship as the current PR; the remaining required work becomes a retained obligation or a new scope in the **same** canonical programme, never a separate plan or a backlog move to meet a size threshold.
 
 #### 6. Knowledge Graduation Gate (Mandatory Before PR)
@@ -777,10 +777,11 @@ flowchart TD
     Axis1 --> AggregateReport["Aggregated Two-Axis Report"]
     Axis2 --> AggregateReport
     
-    AggregateReport --> RightSizing{"4-Point Right-Sizing Check\n• Multi-intent 'and also' scope?\n• > 8–10 major tasks?\n• Big-bang layer mixing?\n• Independent backend shipping value?"}
+    AggregateReport --> RightSizing{"Balanced Right-Sizing Check\n• Genuine multi-week / cross-surface mega-PR?\n• Or over-split phases into 3+ serial PRs\n  (unwired code / throwaway interim work)?"}
     
-    RightSizing -->|2+ Matches| SplitPR["Verdict: Split Before Approval\n(Break into reviewable vertical PRs)"]
-    RightSizing -->|< 2 Matches| FinalVerdict["Final CTO / Maintainer Verdict\n(Approve / Approve with Required Changes)"]
+    RightSizing -->|"Oversized Mega-PR"| SplitPR["Restructure: Split Into Bounded PR Scopes\n(Only Along Real Risk / Contract Boundaries)"]
+    RightSizing -->|"Over-Split (3+ Unjustified PRs)"| ConsolidatePR["Restructure: Consolidate Into 1–2 Multi-Phase PRs\n(Preserve Reviewability via Atomic Phase Commits)"]
+    RightSizing -->|"Right-Sized (1–2 PR Default or Justified 3+)"| FinalVerdict["Final CTO / Maintainer Verdict\n(Approve / Approve with Required Changes)"]
 ```
 
 ### The Fowler 12-Smell Baseline Checklist

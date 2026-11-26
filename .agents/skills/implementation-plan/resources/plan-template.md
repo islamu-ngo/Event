@@ -25,7 +25,7 @@ Record:
 - matched intents, relevant skills, and relevant rules;
 - primary layers touched;
 - S/M/L/XL complexity with evidence-based rationale;
-- **Programme shape:** the stable PR scope IDs in dependency order with a one-line outcome each, and why the split (or single scope) gives independently mergeable outcomes. Mutable delivery, reconciliation, cleanup and delegation state lives in the `tasks.md` registry, never here;
+- **Programme shape:** the stable PR scope IDs in dependency order with a one-line outcome each, and why the chosen PR count (default 1 multi-phase PR, or 2 PRs along a real boundary; explicit justification required for 3+ PRs per [PR sizing default](pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting)) gives clean, independently mergeable outcomes. Mutable delivery, reconciliation, cleanup and delegation state lives in the `tasks.md` registry, never here;
 - **Plane Ticket Reference:** the S item or M parent: `EVENT-XXX`, or `pending: event/work/active-<task-slug>.yaml` until execution mints it;
 - **Plane Tracking Plan** (sizing: [plan-tracking](../../plane-compose/resources/plan-tracking.md)): the plan shape and one row per item the plan owns, nothing more:
 
@@ -170,7 +170,7 @@ Group every phase under the stable PR scope that merges it, following the [PR sc
 - **Rollback / failure handling:**
 ```
 
-A scope that merely renames a large PR fails readiness when smaller independently mergeable outcomes exist. Do not move requested work to backlog to fit a size.
+Follow the [PR sizing default](pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting): both a genuine multi-week mega-PR disguised as one scope and an over-split 3+ PR chain that leaves unwired code or throwaway interim work fail readiness. Prefer 1–2 multi-phase PRs with atomic phase commits unless concrete multi-week or cross-surface boundaries justify more. Do not move requested work to backlog to fit a size.
 
 > [!IMPORTANT]
 > **Single Responsibility Rule (`plan.md` vs `tasks.md`)**:

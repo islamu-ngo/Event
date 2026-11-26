@@ -3,7 +3,7 @@
 > **Audience:** Contributors | Maintainers | AI agents
 > **Status:** Accepted
 > **Owner:** Contributor Experience | Agent Context
-> **Last Verified:** 2026-11-14
+> **Last Verified:** 2026-11-24
 > **Source Anchors:** `.agents/skills/implementation-plan/resources/pr-scope-contract.md`, `.agents/skills/implement-tasks/resources/pr-execution-lifecycle.md`, `.agents/skills/plane-compose/resources/plan-tracking.md`, `docs/internal/project-management/work-item-taxonomy-and-granularity-report.md`, `docs/internal/adr/ADR-plane-project-management-standardization.md`, `.agents/rules/plane-tracking.md`, `islamic-value-sensitive-design/workstreams/i-vsd-multi-pr-agentic-workflow.md`
 
 ---
@@ -24,7 +24,9 @@ This ADR records the accepted model so it does not have to be argued again for e
 
 ### A. Programme → pull request scope → phase → task
 
-A plan is a **programme**. It is divided into **pull request scopes**, each an independently mergeable outcome with its own acceptance and verification boundary. Phases are reviewable commit groups inside one scope, and tasks are checklist steps inside a phase. Every scope has a stable ID and a descriptive outcome name, so status reports never depend on bare phase codes.
+A plan is a **programme**. It is divided into one or more **pull request scopes**, each an independently mergeable outcome with its own acceptance and verification boundary. Phases are reviewable commit groups inside one scope, and tasks are checklist steps inside a phase. Every scope has a stable ID and a descriptive outcome name, so status reports never depend on bare phase codes.
+
+Multi-PR execution is an opt-in structure for genuinely multi-week or cross-surface programmes, **not** a mandate that every plan use several pull requests. Default to **1 multi-phase PR** (or **2 PRs** along one concrete risk, trust, or contract boundary); reserve **3+ PRs** for programmes where a 1–2 PR branch would drift for weeks or mix unrelated release/migration risks, and never split phases into serial PRs that leave unwired code or throwaway transitional work ([PR sizing default](../../../.agents/skills/implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting)).
 
 ### B. One canonical triad, one live detailed ledger per delegated scope
 

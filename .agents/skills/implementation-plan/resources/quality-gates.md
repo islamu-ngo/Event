@@ -24,7 +24,7 @@
 
 - Every phase and task in plan, tasks and context sits under a stable PR scope ID; reordering scopes did not rename them.
 - Each scope states the [required definition](pr-scope-contract.md#required-scope-definition): independently usable outcome, requirements/scenarios, predecessors and consumed contracts, owned paths and exclusions, I-VSD IDs, acceptance, PR acceptance gate, release/docs impact, rollback, and downstream obligations.
-- Each scope is independently mergeable. A large PR renamed as a scope fails when smaller independently mergeable outcomes exist; a split that leaves contradictory merged instructions or unusable intermediate states also fails.
+- Each scope is independently mergeable and obeys the [PR sizing default](pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting). Default to 1 multi-phase PR (or 2 PRs along a real risk/contract boundary); fail a genuine multi-week mega-PR disguised as one scope, and equally fail over-splitting a 1–2 PR effort into 3+ PRs without concrete justification or any split that leaves unwired code, throwaway transitional work, or contradictory intermediate states.
 - Readiness conditions are explicit; an approved programme does not make every future scope Ready.
 - The next candidate is executable in detail; later scopes may carry rolling detail but retain every required outcome, dependency and acceptance criterion. No required work moved to backlog.
 - The `tasks.md` registry lists every scope with delivery, reconciliation, cleanup and delegation fields; `plan.md` carries none of that mutable state.

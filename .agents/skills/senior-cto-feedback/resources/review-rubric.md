@@ -195,25 +195,30 @@ Check:
 - Verification follows the planner's [gates](../../implementation-plan/resources/quality-gates.md#verification-gates): required invariant checks, targeted phase build/test on one provider, every PR's applicable acceptance checks, then final cross-capability programme acceptance. Retain required UI/runtime checks at the PR gate, the Tier 4 documentation exemption, sequential resource profiles and explicitly scoped user overrides.
 - Obsolete compatibility tests are deleted when breaking changes are accepted.
 
-## 11. Sequencing, Delivery Safety, and the 4-Point "Right-Sizing" Rule
+## 11. Sequencing, Delivery Safety, and the Balanced "Right-Sizing" Rule
 
 | Score | Meaning |
 |---|---|
-| 5 | All requested scope remains in one plan with reviewable, independently verifiable phases and increments |
-| 3 | Sequence is plausible but risks large PRs or late discovery |
-| 1 | Big-bang plan with mixed concerns, oversized scope ("and also"), and no rollback |
+| 5 | All requested scope remains in one plan with reviewable phases, atomic commits, and a justified PR count (1–2 multi-phase PRs by default; 3+ only for genuine multi-week/cross-surface boundaries) |
+| 3 | Sequence is plausible but either risks an oversized branch or over-splits phases into unnecessary serial PRs |
+| 1 | Big-bang mega-PR with mixed concerns and no rollback, OR artificial PR fragmentation creating unwired interfaces and throwaway interim work |
 
 Check:
 
-- **The 4-Point "Right-Sizing" Rule** (restructure implementation when 2+ match; preserve plan scope):
-  1. *Independent concerns*: Multiple capabilities need distinct ownership and acceptance boundaries.
-  2. *Oversized increment*: One proposed phase/PR contains more than 8-10 major tasks; the total across a multiphase plan is not itself a failure.
-  3. *Big-bang layer mixing*: Coupled state, contract and consumer changes lack safe intermediate boundaries.
-  4. *Independent shipping value*: A coherent increment can be verified before its dependent consumer.
+- **Default PR Sizing & Anti-Over-Splitting** ([PR scope contract](../../implementation-plan/resources/pr-scope-contract.md#pr-sizing-default-and-anti-over-splitting)):
+  - **Default to 1 multi-phase PR (Shape S)** for a cohesive capability, refactor, or isolated subsystem/tooling workstream, structured into reviewable phases with atomic Conventional Commits.
+  - **2 multi-phase PRs (Shape M)** is the normal ceiling when one concrete risk, trust, contract, or surface boundary exists (e.g., offline CLI vs. signed release pipeline, or backend API contract vs. generated client/UI).
+  - **3+ PRs require concrete justification**: reserve them for genuinely multi-week or cross-surface programmes where 1–2 branches would drift for weeks or mix unrelated release/migration risks.
+  - **Actively consolidate over-split plans**: if a plan proposes 3+ PRs for a single isolated project/tooling surface, turns phases or small helper layers into PRs, merges unused/unwired interfaces onto `develop`, or forces throwaway transitional refactors/test patches/duplicate doc rewrites to bridge PR boundaries, **consolidate into 1–2 multi-phase PRs** instead of splitting further.
+- **The 4-Point "Right-Sizing" Check** (when 2+ match, first structure into reviewable **phases and atomic commits**; add extra **PR boundaries** only when 1–2 PRs would cause genuine multi-week drift, unreviewable risk mixing, or blocked independent shipping):
+  1. *Independent concerns*: Multiple capabilities or trust domains genuinely require distinct ownership, approval gates, and acceptance boundaries.
+  2. *Oversized increment*: One proposed phase/PR would span multi-week execution or exceed ~8–10 major tasks without clean phase/commit boundaries; total phases across a 1–2 PR multi-phase plan is not itself a failure.
+  3. *Big-bang layer mixing*: Coupled schema/migration, API contract, and consumer UI changes lack safe intermediate boundaries.
+  4. *Independent shipping value*: Merging an earlier vertical slice delivers real standalone usability on `develop` (not an unwired port, unused command, or half-migrated state).
 
-  Retain all requested outcomes in the same triad and sequence them into later
-  phases with dependencies, owned paths, acceptance, verification and atomic
-  commit/PR contracts. Do not narrow the active plan or move required scope to
+  Retain all requested outcomes in the same triad and sequence them into phases or
+  PR scopes with dependencies, owned paths, acceptance, verification and atomic
+  commit contracts. Do not narrow the active plan or move required scope to
   backlog. Only explicit user direction can remove a requested outcome.
 
 - Migration and model changes happen before UI reliance.

@@ -75,6 +75,7 @@ Use for:
 - incomplete documentation,
 - inefficient data access likely to matter later,
 - duplicated logic that will drift,
+- over-splitting a 1–2 PR workstream into 3+ serial PRs that treat phases as PRs, merge unwired interfaces/commands, or introduce throwaway transitional work,
 - tasks that lack atomic verification criteria or are too vague for another agent to execute safely.
 
 Required wording:
@@ -162,6 +163,7 @@ Use strong language when warranted:
 - “I would not approve this.”
 - “This is a platform integrity issue, not a polish issue.”
 - “Divide this implementation into reviewable phases while retaining all requested scope.”
+- “Consolidate these phases into 1–2 multi-phase PRs; these intermediate PR boundaries create unwired code and serial merge overhead without real risk isolation.”
 - “This is the wrong layer for this responsibility.”
 - “Because breaking changes are allowed, keeping this compatibility layer is unjustified.”
 - “This is acceptable for a prototype, not for an enterprise self-hostable platform.”

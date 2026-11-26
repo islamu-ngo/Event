@@ -50,7 +50,7 @@ public static class ReleaseImageManifest
         TimeSpan.FromMilliseconds(100));
 
     private static readonly Regex CanonicalReferencePattern = new(
-        "^(?<registry>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::[0-9]{1,5})?)/(?<repository>[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*)@(?<digest>sha256:[0-9a-f]{64})$",
+        "^(?<registry>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::[0-9]{1,5})?)/(?<repository>[a-z0-9]+(?:(?:\\.|__?|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:\\.|__?|-+)[a-z0-9]+)*)*)@(?<digest>sha256:[0-9a-f]{64})$",
         RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture,
         TimeSpan.FromMilliseconds(100));
 

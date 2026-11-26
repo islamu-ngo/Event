@@ -84,37 +84,7 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       both_changed: ${{ steps.check-both.outputs.both_changed }}
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-      registry: ${{ steps.resolve-registry.outputs.registry }}
-      registry-user: ${{ steps.resolve-registry.outputs.registry-user }}
     steps:
-      - name: Resolve container registry configuration
-        id: resolve-registry
-        shell: bash
-        env:
-          CONFIGURED_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
-          CONFIGURED_REGISTRY_USER: ${{ vars.CONTAINER_REGISTRY_USER }}
-          REPO_OWNER: ${{ github.repository_owner }}
-        run: |
-          set -euo pipefail
-          trimmed_registry="${CONFIGURED_REGISTRY#"${CONFIGURED_REGISTRY%%[![:space:]]*}"}"
-          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
-          registry="${trimmed_registry,,}"
-          trimmed_user="${CONFIGURED_REGISTRY_USER#"${CONFIGURED_REGISTRY_USER%%[![:space:]]*}"}"
-          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
-          registry_user="${trimmed_user,,}"
-
-          if [[ -z "${registry}" || "${registry}" == "ghcr.io" ]]; then
-            registry="ghcr.io"
-            registry_user="${registry_user:-${REPO_OWNER,,}}"
-          elif [[ -z "${registry_user}" ]]; then
-            echo "vars.CONTAINER_REGISTRY_USER is required when vars.CONTAINER_REGISTRY='${registry}'." >&2
-            exit 1
-          fi
-
-          {
-            echo "registry=${registry}"
-            echo "registry-user=${registry_user}"
-          } >> "$GITHUB_OUTPUT"
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -210,8 +180,7 @@ jobs:
       image-name: ${{ matrix.image-name }}
       dockerfile: ${{ matrix.dockerfile }}
       context: ${{ matrix.context }}
-      registry: ${{ needs.detect-changes.outputs.registry }}
-      registry-user: ${{ needs.detect-changes.outputs.registry-user }}
+      environment: staging
       build-configuration: Release
       metadata-tags: |
         type=raw,value=develop
@@ -248,6 +217,52 @@ jobs:
           path: artifacts/container-build
           merge-multiple: true
 
+      - name: Resolve staging container registry configuration
+        id: resolve-registry
+        shell: bash
+        env:
+          CONFIGURED_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          CONFIGURED_REGISTRY_USER: ${{ vars.CONTAINER_REGISTRY_USER }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          trimmed_registry="${CONFIGURED_REGISTRY#"${CONFIGURED_REGISTRY%%[![:space:]]*}"}"
+          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
+          registry="${trimmed_registry,,}"
+          trimmed_user="${CONFIGURED_REGISTRY_USER#"${CONFIGURED_REGISTRY_USER%%[![:space:]]*}"}"
+          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
+          registry_user="${trimmed_user,,}"
+
+          if [[ -z "${registry}" || "${registry}" == "ghcr.io" ]]; then
+            registry="ghcr.io"
+            registry_user="${REPO_OWNER,,}"
+          elif [[ -z "${registry_user}" ]]; then
+            echo "vars.CONTAINER_REGISTRY_USER is required when vars.CONTAINER_REGISTRY='${registry}'." >&2
+            exit 1
+          fi
+
+          shopt -s nullglob
+          promotion_files=(artifacts/container-build/*-promotion.json)
+          if [[ "${#promotion_files[@]}" -eq 0 ]]; then
+            echo "No container promotion evidence found under artifacts/container-build." >&2
+            exit 1
+          fi
+
+          expected_prefix="${registry}/${registry_user}/"
+          for promotion_file in "${promotion_files[@]}"; do
+            actual_registry="$(jq -r '.registry' "${promotion_file}")"
+            actual_repo="$(jq -r '.repository' "${promotion_file}")"
+            if [[ "${actual_registry}" != "${registry}" || "${actual_repo}" != "${expected_prefix}"* ]]; then
+              echo "Container build promotion evidence '${promotion_file}' targeted '${actual_repo}', which does not match staging registry '${expected_prefix}'." >&2
+              exit 1
+            fi
+          done
+
+          {
+            echo "registry=${registry}"
+            echo "registry-user=${registry_user}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Resolve API deploy image evidence
         id: api-evidence
         if: ${{ needs.detect-changes.outputs.api == 'true' }}
@@ -267,8 +282,8 @@ jobs:
           coolify-webhook: ${{ secrets.COOLIFY_DEPLOY_API_STAGING_WEBHOOK }}
           coolify-token: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
           smoke-base-url: ${{ vars.STAGING_API_URL }}
-          registry: ${{ needs.detect-changes.outputs.registry }}
-          registry-user: ${{ needs.detect-changes.outputs.registry-user }}
+          registry: ${{ steps.resolve-registry.outputs.registry }}
+          registry-user: ${{ steps.resolve-registry.outputs.registry-user }}
           image-name: islamu-event-api
           immutable-tag-prefix: dev-
           expected-image-digest: ${{ steps.api-evidence.outputs.expected-image-digest }}
@@ -285,8 +300,8 @@ jobs:
           coolify-webhook: ${{ secrets.COOLIFY_DEPLOY_UI_STAGING_WEBHOOK }}
           coolify-token: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
           smoke-base-url: ${{ vars.STAGING_UI_URL }}
-          registry: ${{ needs.detect-changes.outputs.registry }}
-          registry-user: ${{ needs.detect-changes.outputs.registry-user }}
+          registry: ${{ steps.resolve-registry.outputs.registry }}
+          registry-user: ${{ steps.resolve-registry.outputs.registry-user }}
           image-name: islamu-event-ui
           immutable-tag-prefix: dev-
           expected-image-digest: ${{ steps.ui-evidence.outputs.expected-image-digest }}
@@ -299,6 +314,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deployment-staging-evidence
+          overwrite: true
           path: artifacts/deploy/**
           if-no-files-found: warn
           retention-days: 90

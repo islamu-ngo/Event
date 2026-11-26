@@ -227,6 +227,65 @@ public sealed class SyncPublicChangelogTests
         await Assert.That(await File.ReadAllBytesAsync(fixture.ManifestPath)).IsEquivalentTo(originalManifest);
     }
 
+    [Test]
+    public async Task RebuildsFromPostTagSealedReleaseArtifactsWithoutMovingSignedTagAndPreservesFrontmatter()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new ChangelogFixture(
+            frontmatter: "---\ndescription: \"Entries-only chronological release ledger for ISLAMU Event.\"\n---\n");
+        string targetOid = fixture.CreatePostTagSealedRelease(SampleVersion, SampleReleaseDate, SampleSummary);
+
+        (int writeCode, string writeOutput) = fixture.Run();
+        await Assert.That(writeCode).IsEqualTo(Program.Success).Because(writeOutput);
+        string page = await File.ReadAllTextAsync(fixture.PagePath);
+        await Assert.That(page).StartsWith("---\ndescription: \"Entries-only chronological release ledger for ISLAMU Event.\"\n---\n");
+        await Assert.That(page).Contains("## v1.1.0");
+        await Assert.That(page).Contains($"Target commit: `{targetOid}`");
+        await Assert.That(page).Contains("ghcr.io/islamu-ngo/event-api@sha256:");
+        await Assert.That(page).DoesNotContain($"blob/{targetOid}/docs/internal/releases/1.1.0/release-notes.md");
+
+        (int checkCode, string checkOutput) = fixture.Run(check: true);
+        await Assert.That(checkCode).IsEqualTo(Program.Success).Because(checkOutput);
+        await Assert.That(checkOutput).Contains("changelog_current");
+
+        // Tampering with post-tag sealed notes fails closed against SHA256SUMS/manifest.
+        string notesPath = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", SampleVersion, ReleaseArtifactManifest.ReleaseNotesFileName);
+        await File.AppendAllTextAsync(notesPath, "\nUnauthorized post-tag edit.\n");
+        (int tamperedCode, string tamperedOutput) = fixture.Run();
+        await Assert.That(tamperedCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(tamperedOutput).Contains("artifact_manifest_verification_mismatch");
+    }
+
+    [Test]
+    public async Task SupportsExternalSealedArtifactsRootAndRejectsMissingSigstoreBundle()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new ChangelogFixture();
+        string externalSealedRoot = Path.Combine(fixture.Root, "sealed-downloads");
+        fixture.CreatePostTagSealedRelease(SampleVersion, SampleReleaseDate, SampleSummary, externalSealedRoot: externalSealedRoot);
+
+        (int missingRootCode, string missingRootOutput) = fixture.Run();
+        await Assert.That(missingRootCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(missingRootOutput).Contains("artifact_manifest_missing_file:");
+
+        (int okCode, string okOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
+        await Assert.That(okCode).IsEqualTo(Program.Success).Because(okOutput);
+
+        string bundlePath = Path.Combine(externalSealedRoot, SampleVersion, ReleaseArtifactManifest.SigstoreBundleFileName);
+        File.Delete(bundlePath);
+        (int noBundleCode, string noBundleOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);
+        await Assert.That(noBundleCode).IsEqualTo(Program.ToolchainRejected);
+        await Assert.That(noBundleOutput).Contains($"artifact_manifest_missing_file:{ReleaseArtifactManifest.SigstoreBundleFileName}");
+    }
+
     private static string Digest(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     private sealed class PublicationInterruptedException : Exception;
@@ -238,7 +297,7 @@ public sealed class SyncPublicChangelogTests
         private string previousOid;
         private int sequence;
 
-        public ChangelogFixture()
+        public ChangelogFixture(string? frontmatter = null)
         {
             Root = Path.Combine(Path.GetTempPath(), $"islamu-sync-changelog-{Guid.NewGuid():N}");
             RepositoryPath = Path.Combine(Root, "repo");
@@ -251,7 +310,7 @@ public sealed class SyncPublicChangelogTests
             PagePath = Path.Combine(changelogDir, "README.md");
             ManifestPath = Path.Combine(changelogDir, "publication-manifest.v1.json");
             TransactionPath = Path.Combine(changelogDir, ".publication-transaction.v1.json");
-            File.WriteAllText(PagePath, $"{PublicChangelogPolicy.StartMarker}\n{PublicChangelogPolicy.EndMarker}\n");
+            File.WriteAllText(PagePath, $"{frontmatter ?? string.Empty}{PublicChangelogPolicy.StartMarker}\n{PublicChangelogPolicy.EndMarker}\n");
 
             RunExternal(ReleaseToolPaths.SshKeygen, Root, "-q", "-t", "ed25519", "-N", string.Empty, "-C", "changelog-fixture", "-f", keyPath);
             string pub = string.Join(' ', File.ReadAllText(keyPath + ".pub").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
@@ -273,22 +332,110 @@ public sealed class SyncPublicChangelogTests
         public string ManifestPath { get; }
         public string TransactionPath { get; }
 
-        public string[] Arguments(bool check = false)
+        public string[] Arguments(bool check = false, string? sealedArtifactsRoot = null)
         {
-            string[] args =
-            [
+            var args = new List<string>
+            {
                 "sync-public-changelog",
                 "--publication-base", "https://github.com/islamu-ngo/Event/blob/",
                 "--allowed-signers", AllowedSignersPath,
-            ];
-            return check ? [.. args, "--check"] : args;
+            };
+            if (sealedArtifactsRoot is not null)
+            {
+                args.Add("--sealed-artifacts-root");
+                args.Add(sealedArtifactsRoot);
+            }
+
+            if (check)
+            {
+                args.Add("--check");
+            }
+
+            return args.ToArray();
         }
 
-        public (int Code, string Output) Run(bool check = false)
+        public (int Code, string Output) Run(bool check = false, string? sealedArtifactsRoot = null)
         {
             using var output = new StringWriter();
-            int code = SyncPublicChangelogCommand.Run(Arguments(check), output, RepositoryPath);
+            int code = SyncPublicChangelogCommand.Run(Arguments(check, sealedArtifactsRoot), output, RepositoryPath);
             return (code, output.ToString());
+        }
+
+        public string CreatePostTagSealedRelease(
+            string version,
+            string releaseDate,
+            string summary,
+            string? externalSealedRoot = null)
+        {
+            string line = "v" + string.Join('.', version.Split('.')[0], version.Split('.')[1]);
+            string changeCommit = Commit($"feat(registration): deliver {version}");
+            string releaseDir = Path.Combine(RepositoryPath, "docs", "internal", "releases", version);
+            Directory.CreateDirectory(releaseDir);
+
+            // Commit ONLY human-owned inputs before signing the tag (matches release.yml contract).
+            File.WriteAllText(
+                Path.Combine(releaseDir, "release.yaml"),
+                $"Version: {version}\nLine: {line}\nRelease-Date: {releaseDate}\nBase-Stable-Tag: {BaselineTag}\nPrevious-Published-Tag: {previousTag}\nRelease-Range:\n  Base-Ref: {BaselineTag}\n  Base-Oid: {previousOid}\n  Previous-Ref: {previousTag}\n  Previous-Oid: {previousOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: not-applicable\n");
+            File.WriteAllText(Path.Combine(releaseDir, "summary.md"), summary + "\n");
+
+            string prepOid = Commit($"docs(release): prepare human inputs for {version}");
+            Git("-c", GitUserNameConfig, "-c", GitUserEmailConfig,
+                "-c", "gpg.format=ssh", "-c", $"user.signingKey={keyPath}",
+                "tag", "-s", $"v{version}", prepOid, "-m", $"Release v{version}");
+
+            // Stage and seal the 5 post-build artifacts into a clean staging dir, then copy into target dir.
+            string stagingDir = Path.Combine(Root, $"post-tag-stage-{version}");
+            Directory.CreateDirectory(stagingDir);
+            var context = new ReleaseContext(
+                1,
+                new ReleaseContextRelease(version, line, releaseDate, BaselineTag, previousTag, "minor", "stable", true),
+                [new ReleaseContextChange(changeCommit[..12], changeCommit, null, "feat", "registration", $"deliver {version}", summary, false, false, null)],
+                new ReleaseContextEvidence(previousOid, previousOid, [
+                    new ReleaseContextObject(previousOid[..12], previousOid),
+                    new ReleaseContextObject(changeCommit[..12], changeCommit),
+                ]));
+            File.WriteAllText(
+                Path.Combine(stagingDir, ReleaseArtifactManifest.ContractDiffFileName),
+                $$$"""{"baseOid":"{{{previousOid}}}","changes":[],"evaluatedFamilies":["configuration","migrations","openapi"],"headOid":"{{{prepOid}}}","schemaVersion":1,"summary":{"additive":0,"breaking":0,"reviewRequired":0,"total":0}}""" + "\n");
+            File.WriteAllText(
+                Path.Combine(stagingDir, ReleaseArtifactManifest.ReleaseContextFileName),
+                JsonSerializer.Serialize(context, JsonOptions) + "\n");
+            File.WriteAllText(
+                Path.Combine(stagingDir, ReleaseArtifactManifest.ReleaseImagesFileName),
+                ReleaseImageManifestTests.ValidSingleRegistryManifestJson("ghcr.io", "islamu-ngo", version, prepOid) + "\n");
+            File.WriteAllText(
+                Path.Combine(stagingDir, ReleaseArtifactManifest.ReleaseNotesFileName),
+                $"# Release {version}\n\n{summary}\n");
+            File.WriteAllText(
+                Path.Combine(stagingDir, ReleaseArtifactManifest.RenderingContextFileName),
+                $$$"""[{"commits":[],"extra":{"version":"{{{version}}}"},"version":"v{{{version}}}"}]""" + "\n");
+
+            ReleaseArtifactSealResult sealedResult = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
+                stagingDir,
+                version,
+                $"v{version}",
+                prepOid));
+            if (!sealedResult.IsValid)
+            {
+                throw new InvalidOperationException($"Fixture seal failed: {sealedResult.Diagnostic}");
+            }
+
+            File.WriteAllText(
+                Path.Combine(stagingDir, ReleaseArtifactManifest.SigstoreBundleFileName),
+                """{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}""" + "\n");
+
+            string targetSealedDir = externalSealedRoot is not null
+                ? Path.Combine(externalSealedRoot, version)
+                : releaseDir;
+            Directory.CreateDirectory(targetSealedDir);
+            foreach (string file in Directory.EnumerateFiles(stagingDir))
+            {
+                File.Copy(file, Path.Combine(targetSealedDir, Path.GetFileName(file)), overwrite: true);
+            }
+
+            previousTag = $"v{version}";
+            previousOid = prepOid;
+            return prepOid;
         }
 
         public void CreateSignedRelease(

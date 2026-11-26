@@ -5,6 +5,9 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class ReleaseImageManifestTests
 {
     private const string SampleVersion = "1.1.0";
+    private const string GhcrRegistry = "ghcr.io";
+    private const string DefaultOwner = "islamu-ngo";
+    private const string ReferenceInvalidDiagnostic = "image_manifest_reference_invalid";
     private static readonly string SourceOid = new('a', 40);
 
     [Test]
@@ -25,30 +28,40 @@ public sealed class ReleaseImageManifestTests
     [Test]
     public async Task ParsesValidSingleRegistryGhcrOnlyAndAlternativeProviderManifests()
     {
-        string ghcrOnlyJson = ValidSingleRegistryManifestJson("ghcr.io", "islamu-ngo");
+        string ghcrOnlyJson = ValidSingleRegistryManifestJson(GhcrRegistry, DefaultOwner);
         ReleaseImageManifestLoadResult ghcrOnly = ReleaseImageManifest.Parse(ghcrOnlyJson, SampleVersion, SourceOid);
 
         await Assert.That(ghcrOnly.IsValid).IsTrue().Because(ghcrOnly.Diagnostic ?? "valid ghcr-only manifest");
         await Assert.That(ghcrOnly.Manifest!.Images).Count().IsEqualTo(4);
         await Assert.That(ghcrOnly.Manifest.Images.Sum(i => i.CanonicalReferences.Count)).IsEqualTo(4);
 
-        string customMirrorJson = ValidManifestJson(secondaryRegistry: "quay.io", secondaryOwner: "amirakrari.dev");
+        string customMirrorJson = ValidManifestJson(secondaryRegistry: "quay.io", secondaryOwner: "team__events");
         ReleaseImageManifestLoadResult customMirror = ReleaseImageManifest.Parse(
             customMirrorJson,
             SampleVersion,
             SourceOid,
-            requiredRegistries: ["ghcr.io", "quay.io"]);
+            requiredRegistries: [GhcrRegistry, "quay.io"]);
 
-        await Assert.That(customMirror.IsValid).IsTrue().Because(customMirror.Diagnostic ?? "valid custom secondary registry");
+        await Assert.That(customMirror.IsValid).IsTrue().Because(customMirror.Diagnostic ?? "valid custom secondary registry with double underscore");
         await Assert.That(customMirror.Manifest!.Images.Sum(i => i.CanonicalReferences.Count)).IsEqualTo(8);
+
+        string dockerHubMirrorJson = ValidManifestJson(secondaryRegistry: "docker.io", secondaryOwner: "my--org");
+        ReleaseImageManifestLoadResult dockerHubMirror = ReleaseImageManifest.Parse(
+            dockerHubMirrorJson,
+            SampleVersion,
+            SourceOid,
+            requiredRegistries: [GhcrRegistry, "docker.io"]);
+
+        await Assert.That(dockerHubMirror.IsValid).IsTrue().Because(dockerHubMirror.Diagnostic ?? "valid docker hub mirror with consecutive hyphens");
+        await Assert.That(dockerHubMirror.Manifest!.Images.Sum(i => i.CanonicalReferences.Count)).IsEqualTo(8);
 
         ReleaseImageManifestLoadResult missingRequired = ReleaseImageManifest.Parse(
             ghcrOnlyJson,
             SampleVersion,
             SourceOid,
-            requiredRegistries: ["ghcr.io", "quay.io"]);
+            requiredRegistries: [GhcrRegistry, "quay.io"]);
         await Assert.That(missingRequired.IsValid).IsFalse();
-        await Assert.That(missingRequired.Diagnostic).IsEqualTo("image_manifest_reference_invalid");
+        await Assert.That(missingRequired.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
     }
 
     [Test]
@@ -61,30 +74,40 @@ public sealed class ReleaseImageManifestTests
             SampleVersion,
             SourceOid);
         ReleaseImageManifestLoadResult mismatchedDigestRef = ReleaseImageManifest.Parse(
-            ValidManifestJson().Replace($"ghcr.io/islamu-ngo/event-api@sha256:{new string('1', 64)}", $"ghcr.io/islamu-ngo/event-api@sha256:{new string('9', 64)}", StringComparison.Ordinal),
+            ValidManifestJson().Replace($"{GhcrRegistry}/{DefaultOwner}/event-api@sha256:{new string('1', 64)}", $"{GhcrRegistry}/{DefaultOwner}/event-api@sha256:{new string('9', 64)}", StringComparison.Ordinal),
             SampleVersion,
             SourceOid);
         ReleaseImageManifestLoadResult asymmetricRegistry = ReleaseImageManifest.Parse(
-            ValidManifestJson().Replace($"\"atcr.io/islamu-ngo/event-api@sha256:{new string('1', 64)}\",", string.Empty, StringComparison.Ordinal),
+            ValidManifestJson().Replace($"\"atcr.io/{DefaultOwner}/event-api@sha256:{new string('1', 64)}\",", string.Empty, StringComparison.Ordinal),
             SampleVersion,
             SourceOid);
         ReleaseImageManifestLoadResult badHost = ReleaseImageManifest.Parse(
-            ValidSingleRegistryManifestJson("localhost", "islamu-ngo"),
+            ValidSingleRegistryManifestJson("localhost", DefaultOwner),
+            SampleVersion,
+            SourceOid);
+        ReleaseImageManifestLoadResult tripleUnderscoreNamespace = ReleaseImageManifest.Parse(
+            ValidSingleRegistryManifestJson("registry.example.com", "team___events"),
+            SampleVersion,
+            SourceOid);
+        ReleaseImageManifestLoadResult doubleDotNamespace = ReleaseImageManifest.Parse(
+            ValidSingleRegistryManifestJson("registry.example.com", "team..events"),
             SampleVersion,
             SourceOid);
         ReleaseImageManifestLoadResult emptyRefs = ReleaseImageManifest.Parse(
-            ValidSingleRegistryManifestJson("ghcr.io", "islamu-ngo").Replace($"\"ghcr.io/islamu-ngo/event-api@sha256:{new string('1', 64)}\"", string.Empty, StringComparison.Ordinal),
+            ValidSingleRegistryManifestJson(GhcrRegistry, DefaultOwner).Replace($"\"{GhcrRegistry}/{DefaultOwner}/event-api@sha256:{new string('1', 64)}\"", string.Empty, StringComparison.Ordinal),
             SampleVersion,
             SourceOid);
         ReleaseImageManifestLoadResult malformed = ReleaseImageManifest.Parse("{bad", SampleVersion, SourceOid);
 
         await Assert.That(wrongVersion.Diagnostic).IsEqualTo("image_manifest_version_mismatch");
         await Assert.That(wrongCommit.Diagnostic).IsEqualTo("image_manifest_commit_mismatch");
-        await Assert.That(taggedRef.Diagnostic).IsEqualTo("image_manifest_reference_invalid");
-        await Assert.That(mismatchedDigestRef.Diagnostic).IsEqualTo("image_manifest_reference_invalid");
-        await Assert.That(asymmetricRegistry.Diagnostic).IsEqualTo("image_manifest_reference_invalid");
-        await Assert.That(badHost.Diagnostic).IsEqualTo("image_manifest_reference_invalid");
-        await Assert.That(emptyRefs.Diagnostic).IsEqualTo("image_manifest_reference_invalid");
+        await Assert.That(taggedRef.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+        await Assert.That(mismatchedDigestRef.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+        await Assert.That(asymmetricRegistry.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+        await Assert.That(badHost.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+        await Assert.That(tripleUnderscoreNamespace.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+        await Assert.That(doubleDotNamespace.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
+        await Assert.That(emptyRefs.Diagnostic).IsEqualTo(ReferenceInvalidDiagnostic);
         await Assert.That(malformed.Diagnostic).IsEqualTo("image_manifest_invalid");
     }
 
@@ -120,8 +143,8 @@ public sealed class ReleaseImageManifestTests
     }
 
     internal static string ValidSingleRegistryManifestJson(
-        string registry = "ghcr.io",
-        string owner = "islamu-ngo",
+        string registry = GhcrRegistry,
+        string owner = DefaultOwner,
         string version = SampleVersion,
         string? commitOid = null)
     {
@@ -173,7 +196,7 @@ public sealed class ReleaseImageManifestTests
         string version = SampleVersion,
         string? commitOid = null,
         string secondaryRegistry = "atcr.io",
-        string secondaryOwner = "islamu-ngo")
+        string secondaryOwner = DefaultOwner)
     {
         string oid = commitOid ?? SourceOid;
         string d1 = new('1', 64);

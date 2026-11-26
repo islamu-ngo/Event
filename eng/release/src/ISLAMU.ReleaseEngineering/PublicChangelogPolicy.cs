@@ -12,7 +12,9 @@ public sealed record PublicChangelogRelease(
     string NotesSha256,
     string TagObjectId,
     string TargetOid,
-    IReadOnlyList<EnrichedImageReference>? Images = null);
+    IReadOnlyList<EnrichedImageReference>? Images = null,
+    bool NotesInSignedTagTree = true,
+    string? ManifestSha256 = null);
 
 public sealed record PublicChangelogResult(
     bool IsValid, byte[]? Page, string? Diagnostic, string? HighestStableVersion, string? Warning = null);
@@ -124,9 +126,7 @@ public static class PublicChangelogPolicy
             }
 
             string prefix = current[..begin];
-            if (prefix.Length != 0 && (!prefix.StartsWith("---\n", StringComparison.Ordinal) ||
-                !prefix.EndsWith("---\n", StringComparison.Ordinal) ||
-                prefix.Split("---\n", StringSplitOptions.None).Length != 3))
+            if (!IsValidFrontmatterPrefix(prefix))
             {
                 return Invalid("changelog_outside_region_invalid");
             }
@@ -141,6 +141,46 @@ public static class PublicChangelogPolicy
             return Invalid("changelog_utf8_invalid");
         }
     }
+
+    /// <summary>
+    /// Returns true when <paramref name="existing"/> is empty or contains only optional valid YAML
+    /// frontmatter immediately followed by empty start/end sentinel markers.
+    /// </summary>
+    public static bool IsEmptyBootstrapPage(byte[] existing)
+    {
+        if (existing is null || existing.Length > MaximumPageBytes)
+        {
+            return false;
+        }
+
+        if (existing.Length == 0)
+        {
+            return true;
+        }
+
+        try
+        {
+            string current = StrictUtf8.GetString(existing);
+            string emptyMarkers = $"{StartMarker}\n{EndMarker}\n";
+            if (current.Contains('\r', StringComparison.Ordinal) || !current.EndsWith(emptyMarkers, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string prefix = current[..^emptyMarkers.Length];
+            return IsValidFrontmatterPrefix(prefix);
+        }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsValidFrontmatterPrefix(string prefix) =>
+        prefix.Length == 0 ||
+        (prefix.StartsWith("---\n", StringComparison.Ordinal) &&
+         prefix.EndsWith("---\n", StringComparison.Ordinal) &&
+         prefix.Split("---\n", StringSplitOptions.None).Length == 3);
 
     private static bool TryBuildEntry(PublicChangelogRelease release, VersionKey version, Uri publicationBase, out string? text)
     {
@@ -232,8 +272,23 @@ public static class PublicChangelogPolicy
 
         builder.Append("### Verify this release\n\n")
             .Append("- Signed annotated tag: `").Append(tagName).Append("` (`").Append(release.TagObjectId).Append("`)\n")
-            .Append("- Authoritative notes SHA-256: `").Append(release.NotesSha256).Append("`\n")
-            .Append("- [Authoritative release notes](").Append(notes).Append(")\n");
+            .Append("- Authoritative notes SHA-256: `").Append(release.NotesSha256).Append("`\n");
+        if (release.NotesInSignedTagTree)
+        {
+            builder.Append("- [Authoritative release notes](").Append(notes).Append(")\n");
+        }
+        else
+        {
+            builder.Append("- Target commit: `").Append(release.TargetOid).Append("`\n");
+            if (!string.IsNullOrWhiteSpace(release.ManifestSha256))
+            {
+                builder.Append("- Sealed artifact manifest SHA-256: `").Append(release.ManifestSha256).Append("`\n");
+            }
+
+            builder.Append("- Sealed release assets: download `release-notes.md`, `SHA256SUMS`, and `SHA256SUMS.sigstore.json` for `")
+                .Append(tagName)
+                .Append("` and authenticate `SHA256SUMS` with Cosign before verifying checksums.\n");
+        }
 
         if (release.Images is { Count: > 0 })
         {

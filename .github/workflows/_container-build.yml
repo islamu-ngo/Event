@@ -41,6 +41,10 @@ on:
         required: false
         type: string
         default: ""
+      registry-login-user:
+        required: false
+        type: string
+        default: ""
     secrets:
       CONTAINER_REGISTRY_PASSWORD:
         required: false
@@ -81,8 +85,9 @@ jobs:
         env:
           PUSH_MODE: ${{ inputs.push-mode }}
           METADATA_TAGS: ${{ inputs.metadata-tags }}
-          REGISTRY: ${{ inputs.registry }}
-          REGISTRY_USER: ${{ inputs.registry-user }}
+          REGISTRY: ${{ inputs.registry || vars.CONTAINER_REGISTRY }}
+          REGISTRY_USER: ${{ inputs.registry-user || vars.CONTAINER_REGISTRY_USER }}
+          REGISTRY_LOGIN_USER: ${{ inputs.registry-login-user || vars.CONTAINER_REGISTRY_LOGIN_USER }}
           IMAGE_NAME: ${{ inputs.image-name }}
           REGISTRY_SECRET_PRESENT: ${{ secrets.CONTAINER_REGISTRY_PASSWORD != '' }}
           REPO_OWNER: ${{ github.repository_owner }}
@@ -119,10 +124,14 @@ jobs:
           trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
           effective_user="${trimmed_user,,}"
 
+          trimmed_login_user="${REGISTRY_LOGIN_USER#"${REGISTRY_LOGIN_USER%%[![:space:]]*}"}"
+          trimmed_login_user="${trimmed_login_user%"${trimmed_login_user##*[![:space:]]}"}"
+
           if [[ -z "${effective_registry}" || "${effective_registry}" == "ghcr.io" ]]; then
             use_secondary="false"
             primary_registry="ghcr.io"
-            primary_user="${effective_user:-${ghcr_owner}}"
+            primary_user="${ghcr_owner}"
+            primary_login_user=""
             secondary_repo=""
             metadata_images="${ghcr_repo}"
             buildx_outputs="type=image,name=${ghcr_repo},push=true,push-by-digest=true,name-canonical=true"
@@ -132,8 +141,14 @@ jobs:
               exit 1
             fi
 
-            if [[ -z "${effective_user}" || ! "${effective_user}" =~ ^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*$ ]]; then
+            if [[ -z "${effective_user}" || ! "${effective_user}" =~ ^[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*(/[a-z0-9]+((\.|__?|-+)[a-z0-9]+)*)*$ ]]; then
               echo "CONTAINER_REGISTRY_USER is required and must be a valid OCI namespace when targeting '${effective_registry}'." >&2
+              exit 1
+            fi
+
+            effective_login_user="${trimmed_login_user:-${effective_user}}"
+            if [[ -z "${effective_login_user}" || "${effective_login_user}" =~ [[:space:][:cntrl:]] ]]; then
+              echo "CONTAINER_REGISTRY_LOGIN_USER must be a non-empty single-token login username without whitespace or control characters." >&2
               exit 1
             fi
 
@@ -145,6 +160,7 @@ jobs:
             use_secondary="true"
             primary_registry="${effective_registry}"
             primary_user="${effective_user}"
+            primary_login_user="${effective_login_user}"
             secondary_repo="${effective_registry}/${effective_user}/${IMAGE_NAME}"
             metadata_images="$(printf '%s\n%s' "${secondary_repo}" "${ghcr_repo}")"
             buildx_outputs="$(printf 'type=image,name=%s,push=true,push-by-digest=true,name-canonical=true\ntype=image,name=%s,push=true,push-by-digest=true,name-canonical=true' "${secondary_repo}" "${ghcr_repo}")"
@@ -154,6 +170,7 @@ jobs:
             echo "use-secondary=${use_secondary}"
             echo "primary-registry=${primary_registry}"
             echo "primary-user=${primary_user}"
+            echo "primary-login-user=${primary_login_user}"
             echo "ghcr-owner=${ghcr_owner}"
             echo "ghcr-repository=${ghcr_repo}"
             echo "secondary-repository=${secondary_repo}"
@@ -186,7 +203,7 @@ jobs:
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ steps.validate.outputs.primary-registry }}
-          username: ${{ steps.validate.outputs.primary-user }}
+          username: ${{ steps.validate.outputs.primary-login-user }}
           password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
       - name: Log in to GHCR
@@ -315,7 +332,7 @@ jobs:
 
           if [[ "${USE_SECONDARY}" == "true" ]]; then
             references_json="$(jq -n --arg secondary "${SECONDARY_REF}" --arg ghcr "${GHCR_REF}" '[$secondary, $ghcr] | sort')"
-            docker buildx imagetools inspect "${SECONDARY_REF}" > "artifacts/container/${IMAGE_NAME}-secondary-oci-inspect.txt"
+            docker buildx imagetools inspect "${SECONDARY_REF}" | tee "artifacts/container/${IMAGE_NAME}-secondary-oci-inspect.txt"
           else
             references_json="$(jq -n --arg ghcr "${GHCR_REF}" '[$ghcr]')"
           fi
@@ -347,7 +364,7 @@ jobs:
                 runId: $runId,
                 runAttempt: $runAttempt
               }
-            }' > "artifacts/container/${IMAGE_NAME}-digest.json"
+            }' | tee "artifacts/container/${IMAGE_NAME}-digest.json"
 
           {
             echo "## Container image digest-only staging"
@@ -512,6 +529,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: container-build-${{ inputs.image-name }}
+          overwrite: true
           path: artifacts/container/**
           if-no-files-found: warn
           retention-days: 90

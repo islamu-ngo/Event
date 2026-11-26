@@ -34,6 +34,14 @@ public sealed record ReleaseArtifactSealResult(
     string? ChecksumsContent,
     string? Diagnostic);
 
+public sealed record ReleaseArtifactVerificationResult(
+    bool IsValid,
+    ReleaseArtifactManifestDocument? Manifest,
+    byte[]? ContextBytes,
+    byte[]? NotesBytes,
+    string? ManifestSha256,
+    string? Diagnostic);
+
 /// <summary>
 /// Validates and seals the exact five release artifacts (<c>contract-diff.v1.json</c>,
 /// <c>release-context.v1.json</c>, <c>release-images.v1.json</c>, <c>release-notes.md</c>,
@@ -43,15 +51,17 @@ public sealed record ReleaseArtifactSealResult(
 public static class ReleaseArtifactManifest
 {
     public const string ChecksumsFileName = "SHA256SUMS";
+    public const string SigstoreBundleFileName = "SHA256SUMS.sigstore.json";
     public const string ManifestFileName = "release-artifact-manifest.v1.json";
+    public const string ContractDiffFileName = "contract-diff.v1.json";
+    public const string ReleaseContextFileName = "release-context.v1.json";
+    public const string ReleaseImagesFileName = "release-images.v1.json";
+    public const string ReleaseNotesFileName = "release-notes.md";
+    public const string RenderingContextFileName = "release-rendering-context.v1.json";
 
     private const int ExpectedSchemaVersion = 1;
     private const long MaximumArtifactFileBytes = 16L * 1024 * 1024;
-    private const string ContractDiffFileName = "contract-diff.v1.json";
-    private const string ReleaseContextFileName = "release-context.v1.json";
-    private const string ReleaseImagesFileName = "release-images.v1.json";
-    private const string ReleaseNotesFileName = "release-notes.md";
-    private const string RenderingContextFileName = "release-rendering-context.v1.json";
+    private const long MaximumSigstoreBundleBytes = 1024L * 1024;
 
     private static class Diagnostics
     {
@@ -69,6 +79,8 @@ public static class ReleaseArtifactManifest
         public const string JsonInvalid = "artifact_manifest_json_invalid";
         public const string NormalizationFailed = "artifact_manifest_normalization_failed";
         public const string WriteFailed = "artifact_manifest_write_failed";
+        public const string VerificationMismatch = "artifact_manifest_verification_mismatch";
+        public const string SigstoreBundleInvalid = "artifact_manifest_sigstore_bundle_invalid";
     }
 
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -160,6 +172,85 @@ public static class ReleaseArtifactManifest
             : new ReleaseArtifactSealResult(true, manifest, manifestJson, checksumText, null);
     }
 
+    /// <summary>
+    /// Verifies an existing sealed artifact directory against <c>release-artifact-manifest.v1.json</c>
+    /// and <c>SHA256SUMS</c> without modifying any files. Used by post-tag release consumers such as
+    /// <see cref="SyncPublicChangelogCommand"/> where human-owned inputs (<c>release.yaml</c>,
+    /// <c>summary.md</c>) may coexist alongside sealed post-build release artifacts.
+    /// </summary>
+    public static ReleaseArtifactVerificationResult VerifySealedDirectory(
+        string directory,
+        string expectedVersion,
+        string expectedTag,
+        string expectedCommitOid,
+        bool requireSigstoreBundle = false)
+    {
+        var request = new ReleaseArtifactSealRequest(directory, expectedVersion, expectedTag, expectedCommitOid);
+        string? requestError = ValidateIdentityAndDirectory(request, out string resolvedDir);
+        if (requestError is not null)
+        {
+            return VerificationFailed(requestError);
+        }
+
+        string? filesError = CollectSealedDirectoryFiles(resolvedDir, out Dictionary<string, string> filesByName);
+        if (filesError is not null)
+        {
+            return VerificationFailed(filesError);
+        }
+
+        string? contentError = ValidateArtifactContents(filesByName, request, out IReadOnlyList<EnrichedImageReference>? images);
+        if (contentError is not null)
+        {
+            return VerificationFailed(contentError);
+        }
+
+        string? hashError = HashArtifacts(filesByName, out SealedArtifactFileEntry[] fileEntries);
+        if (hashError is not null)
+        {
+            return VerificationFailed(hashError);
+        }
+
+        var expectedManifest = new ReleaseArtifactManifestDocument(
+            ExpectedSchemaVersion,
+            expectedVersion,
+            expectedTag,
+            expectedCommitOid,
+            fileEntries,
+            images!);
+        string? serializeError = BuildCanonicalOutputs(
+            expectedManifest,
+            out byte[] expectedManifestBytes,
+            out _,
+            out byte[] expectedChecksumBytes,
+            out _);
+        if (serializeError is not null)
+        {
+            return VerificationFailed(serializeError);
+        }
+
+        string? matchError = VerifyPersistedSealedOutputs(
+            resolvedDir,
+            expectedManifestBytes,
+            expectedChecksumBytes,
+            requireSigstoreBundle);
+        if (matchError is not null)
+        {
+            return VerificationFailed(matchError);
+        }
+
+        try
+        {
+            byte[] contextBytes = File.ReadAllBytes(filesByName[ReleaseContextFileName]);
+            byte[] notesBytes = File.ReadAllBytes(filesByName[ReleaseNotesFileName]);
+            string manifestHash = Convert.ToHexStringLower(SHA256.HashData(expectedManifestBytes));
+            return new ReleaseArtifactVerificationResult(true, expectedManifest, contextBytes, notesBytes, manifestHash, null);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return VerificationFailed(Diagnostics.DirectoryInvalid);
+        }
+    }
+
     public static int RunCli(string[] args, TextWriter output, string defaultBaseDirectory)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -192,8 +283,21 @@ public static class ReleaseArtifactManifest
         out string artifactDirectory,
         out string outputDirectory)
     {
-        artifactDirectory = string.Empty;
         outputDirectory = string.Empty;
+        string? identityError = ValidateIdentityAndDirectory(request, out artifactDirectory);
+        if (identityError is not null)
+        {
+            return identityError;
+        }
+
+        return ResolveOutputDirectory(request.OutputDirectory, artifactDirectory, out outputDirectory);
+    }
+
+    private static string? ValidateIdentityAndDirectory(
+        ReleaseArtifactSealRequest request,
+        out string artifactDirectory)
+    {
+        artifactDirectory = string.Empty;
 
         if (string.IsNullOrWhiteSpace(request.Version) || !SemVerPattern.IsMatch(request.Version))
         {
@@ -217,7 +321,99 @@ public static class ReleaseArtifactManifest
             return Diagnostics.DirectoryInvalid;
         }
 
-        return ResolveOutputDirectory(request.OutputDirectory, artifactDirectory, out outputDirectory);
+        return null;
+    }
+
+    private static string? CollectSealedDirectoryFiles(string directory, out Dictionary<string, string> filesByName)
+    {
+        filesByName = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string required in RequiredArtifactFiles)
+        {
+            string fullPath = Path.Combine(directory, required);
+            if (!File.Exists(fullPath))
+            {
+                return $"artifact_manifest_missing_file:{required}";
+            }
+
+            FileAttributes attributes = File.GetAttributes(fullPath);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                return Diagnostics.SymlinkRejected;
+            }
+
+            filesByName[required] = fullPath;
+        }
+
+        return null;
+    }
+
+    private static string? VerifyPersistedSealedOutputs(
+        string directory,
+        byte[] expectedManifestBytes,
+        byte[] expectedChecksumBytes,
+        bool requireSigstoreBundle)
+    {
+        string manifestPath = Path.Combine(directory, ManifestFileName);
+        string checksumsPath = Path.Combine(directory, ChecksumsFileName);
+        if (!File.Exists(manifestPath))
+        {
+            return $"artifact_manifest_missing_file:{ManifestFileName}";
+        }
+
+        if (!File.Exists(checksumsPath))
+        {
+            return $"artifact_manifest_missing_file:{ChecksumsFileName}";
+        }
+
+        if (HasReparsePointInExistingPath(manifestPath) || HasReparsePointInExistingPath(checksumsPath))
+        {
+            return Diagnostics.SymlinkRejected;
+        }
+
+        try
+        {
+            if (new FileInfo(manifestPath).Length > MaximumArtifactFileBytes ||
+                new FileInfo(checksumsPath).Length > MaximumArtifactFileBytes)
+            {
+                return Diagnostics.FileSizeInvalid;
+            }
+
+            byte[] actualManifestBytes = File.ReadAllBytes(manifestPath);
+            byte[] actualChecksumBytes = File.ReadAllBytes(checksumsPath);
+            if (!actualManifestBytes.AsSpan().SequenceEqual(expectedManifestBytes) ||
+                !actualChecksumBytes.AsSpan().SequenceEqual(expectedChecksumBytes))
+            {
+                return Diagnostics.VerificationMismatch;
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return Diagnostics.DirectoryInvalid;
+        }
+
+        return requireSigstoreBundle ? ValidateSigstoreBundleFile(Path.Combine(directory, SigstoreBundleFileName)) : null;
+    }
+
+    private static string? ValidateSigstoreBundleFile(string bundlePath)
+    {
+        if (!File.Exists(bundlePath))
+        {
+            return $"artifact_manifest_missing_file:{SigstoreBundleFileName}";
+        }
+
+        if (HasReparsePointInExistingPath(bundlePath))
+        {
+            return Diagnostics.SymlinkRejected;
+        }
+
+        var info = new FileInfo(bundlePath);
+        if (info.Length <= 0 || info.Length > MaximumSigstoreBundleBytes ||
+            !IsValidJsonFile(bundlePath, JsonValueKind.Object))
+        {
+            return Diagnostics.SigstoreBundleInvalid;
+        }
+
+        return null;
     }
 
     private static string? ResolveOutputDirectory(
@@ -310,15 +506,9 @@ public static class ReleaseArtifactManifest
             return Diagnostics.DirectoryInvalid;
         }
 
-        foreach (string required in RequiredArtifactFiles)
-        {
-            if (!filesByName.ContainsKey(required))
-            {
-                return $"artifact_manifest_missing_file:{required}";
-            }
-        }
-
-        return null;
+        Dictionary<string, string> discovered = filesByName;
+        string? missingRequired = RequiredArtifactFiles.FirstOrDefault(required => !discovered.ContainsKey(required));
+        return missingRequired is not null ? $"artifact_manifest_missing_file:{missingRequired}" : null;
     }
 
     private static string? ValidateSingleDirectoryEntry(
@@ -698,9 +888,10 @@ public static class ReleaseArtifactManifest
     private static bool IsStrictDescendant(string parentDirectory, string candidatePath)
     {
         string relative = Path.GetRelativePath(parentDirectory, candidatePath);
-        return relative != "." &&
-            !relative.StartsWith("..", StringComparison.Ordinal) &&
-            !Path.IsPathRooted(relative);
+        bool escapesParent = relative == ".." ||
+            relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal) ||
+            relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
+        return relative != "." && !escapesParent && !Path.IsPathRooted(relative);
     }
 
     private static bool HasReparsePointInExistingPath(string fullPath)
@@ -731,4 +922,7 @@ public static class ReleaseArtifactManifest
 
     private static ReleaseArtifactSealResult Invalid(string diagnostic) =>
         new(false, null, null, null, diagnostic);
+
+    private static ReleaseArtifactVerificationResult VerificationFailed(string diagnostic) =>
+        new(false, null, null, null, null, diagnostic);
 }

@@ -31,50 +31,55 @@ Release builds stage OCI indexes strictly **by digest** (`push-by-digest=true`, 
 docker pull ghcr.io/islamu-ngo/islamu-event-standalone@sha256:<digest>
 ```
 
-When an optional external OCI registry mirror (such as ATCR, Quay, or another OCI registry configured via `CONTAINER_REGISTRY`) is active for a release, its canonical `registry/namespace/image@sha256:<digest>` reference is listed alongside GHCR and signed individually.
+When an optional external OCI registry mirror (such as Docker Hub `docker.io`, Quay `quay.io`, ATCR, or another OCI-compliant registry configured via `CONTAINER_REGISTRY`) is active for a release, its canonical `registry/namespace/image@sha256:<digest>` reference is listed alongside GHCR and signed individually.
 
-## Verify a release offline (Git tag and file checksums)
+## Verify a release (trust root, signatures, and checksums)
 
-Offline verification proves tag authenticity against the reviewed SSH signer file and exact file integrity without contacting external services:
+A complete release check has two distinct layers: **cryptographic authenticity** (proving who signed the tag and which workflow built the assets) and **file checksum consistency** (proving downloaded files were not corrupted). Always establish trust roots and authenticate `SHA256SUMS` before relying on `sha256sum --check`:
 
-1. **Verify the annotated SSH-signed Git tag:**
+### 1. Authenticate the annotated SSH-signed Git tag (offline)
 
-   ```bash
-   git -c gpg.format=ssh \
-     -c gpg.ssh.allowedSignersFile=eng/release/trust/allowed-signers \
-     verify-tag v<version>
-   ```
+Never rely solely on `eng/release/trust/allowed-signers` from the same untrusted checkout or tag you are verifying—an attacker who supplies both a forged tag and checkout could replace the signer file inside that checkout. Obtain and authenticate the trusted `allowed-signers` file (or verify the operator's SSH key fingerprints) from an **independent trusted source** first (for example, an already-verified prior release commit, an independently reviewed protected `main` branch, or the out-of-band key fingerprints recorded in `eng/release/trust/rotation-history.md`), save it outside the untrusted checkout (for example `/path/to/trusted-allowed-signers`), and then verify:
 
-   You can also invoke the repository verifier to confirm tag-object header equality and exact commit binding:
+```bash
+git -c gpg.format=ssh \
+  -c gpg.ssh.allowedSignersFile=/path/to/trusted-allowed-signers \
+  verify-tag v<version>
+```
 
-   ```bash
-   dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
-     verify-release-tag --tag v<version> --target <full-commit-oid>
-   ```
+You can also invoke the repository verifier with that independent signer file to confirm tag-object header equality and exact commit binding:
 
-2. **Verify downloaded release file integrity against `SHA256SUMS`:**
+```bash
+dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
+  verify-release-tag --tag v<version> --target <full-commit-oid> \
+  --allowed-signers /path/to/trusted-allowed-signers
+```
 
-   Download the release assets (`contract-diff.v1.json`, `release-artifact-manifest.v1.json`, `release-context.v1.json`, `release-images.v1.json`, `release-notes.md`, `release-rendering-context.v1.json`, `SHA256SUMS`, and `SHA256SUMS.sigstore.json`) into one directory and run:
+### 2. Authenticate `SHA256SUMS` before verifying asset checksums
 
-   ```bash
-   sha256sum --check SHA256SUMS
-   ```
+Running `sha256sum --check SHA256SUMS` alone proves only internal checksum consistency among downloaded files; it does **not** prove authenticity, because the signed Git tag covers the source commit tree rather than post-build generated release assets, and an attacker who replaces an asset could also replace `SHA256SUMS`.
 
-## Verify provenance and signatures online (Cosign and GitHub attestations)
+Download all eight release assets (`contract-diff.v1.json`, `release-artifact-manifest.v1.json`, `release-context.v1.json`, `release-images.v1.json`, `release-notes.md`, `release-rendering-context.v1.json`, `SHA256SUMS`, and `SHA256SUMS.sigstore.json`) into one directory, **authenticate `SHA256SUMS` first** with Cosign (online against Sigstore trust roots), and **then** verify every file checksum offline:
+
+```bash
+# Step A: Cryptographically authenticate SHA256SUMS via its Sigstore OIDC bundle (online)
+cosign verify-blob \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/islamu-ngo/Event/.github/workflows/release.yml@refs/tags/v<version>" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  SHA256SUMS
+
+# Step B: Verify every downloaded release asset matches the authenticated SHA256SUMS (offline)
+sha256sum --check SHA256SUMS
+```
+
+In air-gapped environments where Cosign online verification is not available on the target host, run Step A on an online verification station (or compare `SHA256SUMS` against an out-of-band authenticated copy) before transferring the assets and running `sha256sum --check SHA256SUMS` offline.
+
+### 3. Verify container image signatures and GitHub SLSA attestations (online)
 
 Online verification establishes cryptographic OIDC workload identity, Sigstore transparency-log inclusion, and GitHub SLSA v1.0 provenance (normally requiring network access to trust roots, container registries, and GitHub APIs):
 
-1. **Verify the Cosign OIDC bundle for `SHA256SUMS`:**
-
-   ```bash
-   cosign verify-blob \
-     --bundle SHA256SUMS.sigstore.json \
-     --certificate-identity "https://github.com/islamu-ngo/Event/.github/workflows/release.yml@refs/tags/v<version>" \
-     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-     SHA256SUMS
-   ```
-
-2. **Verify every published container image digest reference listed in `release-artifact-manifest.v1.json`:**
+1. **Verify every published container image digest reference listed in `release-artifact-manifest.v1.json`:**
 
    Signatures are repository-scoped (a GHCR signature does not authenticate a mirror reference in another registry). Verify the exact reference you pull:
 
@@ -85,7 +90,7 @@ Online verification establishes cryptographic OIDC workload identity, Sigstore t
      <registry>/<namespace>/<image>@sha256:<digest>
    ```
 
-3. **Verify GitHub SLSA v1.0 attestations for sealed files and GHCR OCI images:**
+2. **Verify GitHub SLSA v1.0 attestations for sealed files and GHCR OCI images:**
 
    ```bash
    gh attestation verify release-notes.md \

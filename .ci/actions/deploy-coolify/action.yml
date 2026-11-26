@@ -103,6 +103,7 @@ runs:
             echo "| Deployment freeze | ${DEPLOYMENT_FREEZE} |"
             echo "| Override reason | ${OVERRIDE_REASON:-not provided} |"
             echo "| Workflow run | ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} |"
+            echo "| Coolify image verification caveat | Webhook GET trigger does not pass or read back the deployed image reference/digest; confirm the Coolify resource targets \`${REGISTRY}/${REGISTRY_USER}/${IMAGE_NAME}\` and verify the running container digest equals \`${EXPECTED_IMAGE_DIGEST}\`. |"
             echo
             echo "Rollback: redeploy the previous known-good Coolify deployment or retarget Coolify to the previous immutable image tag/digest per the release runbook."
           } | tee "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"

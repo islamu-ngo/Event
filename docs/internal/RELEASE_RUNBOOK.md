@@ -122,13 +122,16 @@ When the Project Steward authorizes enrollment:
    ssh-keygen -t ed25519 -C "islamu-release-operator"
    ```
 2. Add the reviewed principal line (`<principal> namespaces="git" ssh-ed25519 <base64-key>`) to `eng/release/trust/allowed-signers`, record the rotation/enrollment in `eng/release/trust/rotation-history.md`, and merge through protected review.
-3. Configure the GitHub `release` environment (required reviewers, tag protection `v*` only) and optional container registry settings in GitHub Repository or Environment **Settings → Secrets and variables → Actions** (zero registry hosts or personal handles are hardcoded in workflow YAML):
+3. Configure the GitHub `release` environment (required reviewers, tag protection `v*` only), a GitHub **tag ruleset** restricting updates and deletions on `v*` (with reviewed minimal bypass actors), and optional container registry settings in GitHub Repository or Environment (`release` / `production` / `staging`) **Settings → Secrets and variables → Actions** (zero registry hosts or personal handles are hardcoded in workflow YAML):
 
    | Setting | Kind | Required | Purpose |
    |---|---|---|---|
-   | `CONTAINER_REGISTRY` | Variable (`vars`) | Optional | External OCI registry host (e.g., `atcr.io`, `quay.io`, `docker.io`). Leave unset or set `ghcr.io` for **GHCR-only** releases (`4` canonical digest references). |
-   | `CONTAINER_REGISTRY_USER` | Variable (`vars`) | When `CONTAINER_REGISTRY` is non-GHCR | Registry username or namespace (e.g., `<registry-namespace>`). Defaults to lowercase `github.repository_owner` for GHCR. |
+   | `CONTAINER_REGISTRY` | Variable (`vars`) | Optional | External OCI registry host (e.g., `docker.io`, `quay.io`, `atcr.io`). Leave unset or set `ghcr.io` for **GHCR-only** releases (`4` canonical digest references; namespace always resolves to lowercase `github.repository_owner`). |
+   | `CONTAINER_REGISTRY_USER` | Variable (`vars`) | When `CONTAINER_REGISTRY` is non-GHCR | OCI repository namespace (e.g., Docker Hub org/user or Quay namespace; supports OCI separators `.`, `_`, `__`, `-+`). Ignored in GHCR-only mode. |
+   | `CONTAINER_REGISTRY_LOGIN_USER` | Variable (`vars`) | Optional | Login username for the external registry when it differs from the OCI namespace (for example a Quay robot `org+deploy` or a personal Docker Hub username pushing to a Docker Hub org). Defaults to `CONTAINER_REGISTRY_USER` when unset. |
    | `CONTAINER_REGISTRY_PASSWORD` | Secret (`secrets`) | When `CONTAINER_REGISTRY` is non-GHCR | Registry password or token for the external OCI registry. Unused in GHCR-only mode (uses built-in `GITHUB_TOKEN`). |
+
+   **Coolify registry cutover check:** Coolify webhooks (`deploy-coolify.yml` / `deploy-coolify-develop.yml`) are bearer-authenticated `GET` triggers that neither set nor verify the deployed container image reference or digest. Before the first staging or production deployment after changing `CONTAINER_REGISTRY` (for example cutting over from ATCR to GHCR-only, or later to Docker Hub), update the Coolify API and UI resource image repositories and pull credentials to match `<registry>/<namespace>/islamu-event-{api,ui}`, and verify in Coolify after deployment that the running container digest equals `Expected image digest` from the deployment summary.
 
 ## Executing a governed release
 
@@ -173,55 +176,63 @@ Push the verified tag (`git push origin "v<version>"`). Pushing a matching SemVe
 
 The workflow executes six least-privilege jobs under per-tag concurrency (`cancel-in-progress: false`) and the protected `release` environment:
 
-1. **`preflight` (`contents: read`):** runs `verify-release-tag --tag <tag> --event-sha <sha>` against `eng/release/trust/allowed-signers`, validates `vars.CONTAINER_REGISTRY` / `vars.CONTAINER_REGISTRY_USER` / `secrets.CONTAINER_REGISTRY_PASSWORD` (GHCR-only `4` refs when unset or `ghcr.io`, or `8` refs with an external OCI mirror), and checks GitHub Releases HTTP status before any build:
-   - HTTP `404` → proceeds (`should-publish=true`).
-   - HTTP `200` → downloads existing published assets and verifies `SHA256SUMS`, `cosign verify-blob` against `release.yml@refs/tags/<tag>`, and `release-artifact-manifest.v1.json` (`version`, `tag`, `sourceCommitOid`, 4 images, symmetric canonical references). Matching sealed releases exit `0` as an idempotent no-op with zero builds; any mismatch fails closed.
+1. **`preflight` (`contents: read`):** runs `verify-release-tag --tag <tag> --event-sha <sha>` against `eng/release/trust/allowed-signers`, runs the pre-build sealed-release guard BEFORE requiring mirror credentials:
+   - HTTP `404` → proceeds (`should-publish=true`) and then validates `vars.CONTAINER_REGISTRY` / `vars.CONTAINER_REGISTRY_USER` / optional `vars.CONTAINER_REGISTRY_LOGIN_USER` / `secrets.CONTAINER_REGISTRY_PASSWORD` (GHCR-only `4` refs when unset or `ghcr.io`, or `8` refs with an external OCI mirror).
+   - HTTP `200` → downloads existing published assets and verifies `SHA256SUMS`, `cosign verify-blob` against `release.yml@refs/tags/<tag>`, and `release-artifact-manifest.v1.json` (`version`, `tag`, `sourceCommitOid`, 4 images, symmetric canonical references). Matching sealed releases exit `0` as an idempotent no-op with zero builds even if mirror credentials were rotated or removed; any mismatch fails closed.
    - Any other HTTP status → fails closed before building.
-2. **`build-images` (`_container-build.yml`, `push-mode: digest-only`):** builds all four multi-arch `.NET 10` OCI indexes (`islamu-event-api`, `islamu-event-ui`, `islamu-event-standalone`, `islamu-event-migration-service`) with zero GHA build cache, exports Buildx SBOM/provenance inspections, scans with Trivy (`CRITICAL,HIGH`), stages by digest only (`push=true,push-by-digest=true,name-canonical=true`) to GHCR (and the configured external OCI mirror, if any) with **no registry tags**, and creates/verifies GHCR SLSA attestations.
-3. **`prepare-and-seal` (`contents: read`):** assembles canonical `release-images.v1.json` (4 images and every staged canonical tagless reference), provisions verified `git-cliff` `2.14.2`, runs offline `prepare <release-dir> --image-manifest release-images.v1.json` (Stage 1 transient `--context` → Stage 2 allowlisted `release-rendering-context.v1.json` → Stage 3 `--from-context -` three-persona `release-notes.md`), and runs `seal-artifacts` to produce `release-artifact-manifest.v1.json` and sorted `SHA256SUMS` without clobbering.
+2. **`build-images` (`_container-build.yml`, `push-mode: digest-only`):** builds all four multi-arch `.NET 10` OCI indexes (`islamu-event-api`, `islamu-event-ui`, `islamu-event-standalone`, `islamu-event-migration-service`) with zero GHA build cache, exports Buildx SBOM/provenance inspections, scans with Trivy (`CRITICAL,HIGH`), stages by digest only (`push=true,push-by-digest=true,name-canonical=true`) to GHCR (and the configured external OCI mirror, if any) with **no registry tags**, and creates/verifies GHCR SLSA attestations. Artifact uploads set `overwrite: true` so job reruns do not collide on `409 Conflict`.
+3. **`prepare-and-seal` (`contents: read`):** assembles canonical `release-images.v1.json` (4 images and every staged canonical tagless reference), provisions verified `git-cliff` `2.14.2`, runs offline `prepare <release-dir> --image-manifest release-images.v1.json` (Stage 1 transient `--context` → Stage 2 allowlisted `release-rendering-context.v1.json` → Stage 3 `--from-context -` three-persona `release-notes.md`), and runs `seal-artifacts` into a fresh temp directory to produce `release-artifact-manifest.v1.json` and sorted `SHA256SUMS` without clobbering.
 4. **`sign-and-attest` (`packages: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write`):** verifies sealed checksums and exact 7-file inventory, generates GitHub SLSA file attestations (`actions/attest`), Cosign-signs and verifies **every** canonical `registry/repository@sha256:<digest>` reference across every configured registry individually, signs and verifies `SHA256SUMS` via `cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json`, and verifies every GitHub file attestation via `gh attestation verify`.
-5. **`publish-release` (`contents: write` only):** re-verifies `SHA256SUMS` and `SHA256SUMS.sigstore.json`, creates or resumes a single draft GitHub Release for `v<version>` without `--clobber` (refusing any published release, multiple drafts, wrong target commit, unexpected assets, or differing existing draft bytes), downloads all 8 draft assets to verify byte-for-byte equality and `sha256sum --check SHA256SUMS`, and publishes once (`gh release edit --draft=false`).
-6. **`append-contributors` (`contents: write`, `continue-on-error: true`):** runs AFTER sealed publication using verified `git-cliff` `2.14.2` with `eng/release/cliff-github-contributors.toml` and `--no-exec` (the sole online exception). Rejects any email address pattern, degrades cleanly to unchanged identity-free signed notes if remote metadata is absent or fails, and appends `@handle` / PR links exclusively to the mutable GitHub Release body.
+5. **`publish-release` (`contents: write` only):** re-verifies `SHA256SUMS` and `SHA256SUMS.sigstore.json`, verifies remote tag-object binding (`refs/tags/<tag>` object type `tag`, SHA `== tag-object-id`, target commit `== target-commit`), creates or resumes a single draft GitHub Release by numeric ID without `--clobber` (refusing any published release, multiple drafts, wrong target commit, unexpected assets, or differing deterministic asset bytes; preserving an existing draft `SHA256SUMS.sigstore.json` only if it independently verifies `SHA256SUMS` via Cosign), downloads all 8 draft assets to verify byte-for-byte equality + `sha256sum --check SHA256SUMS` + `cosign verify-blob`, re-verifies tag binding and exact draft asset identities `(id, name, size, updated_at, digest)` immediately before publishing once (`PATCH /releases/<draft-id>` `draft=false`), and immediately runs a post-publish round-trip verification (failing loudly and blocking `append-contributors` if any mutation occurred in the publish window).
+6. **`append-contributors` (`contents: write`, `continue-on-error: true`):** runs AFTER sealed publication and post-publish verification using verified `git-cliff` `2.14.2` with `eng/release/cliff-github-contributors.toml` and `--no-exec` (the sole online exception). Rejects any email address pattern, degrades cleanly to unchanged identity-free signed notes if remote metadata is absent or fails, and appends `@handle` / PR links exclusively to the mutable GitHub Release body.
 
-### Step 5 — Synchronize the public changelog ledger
+### Step 5 — Synchronize the public changelog ledger (post-tag sealed archive)
 
-After a release tag is published, update `docs/public/changelog/README.md` locally or via PR:
+Because generated release artifacts are built and sealed **after** tagging (so they include real built OCI image digests), synchronize `docs/public/changelog/README.md` in a normal post-release PR without ever moving the signed tag:
+
+1. Download the published eight release assets for `v<version>` into `docs/internal/releases/<version>/` (leaving committed `release.yaml` and `summary.md` untouched) — or into a staging root `<dir>/<version>/` passed via `--sealed-artifacts-root <dir>`.
+2. Authenticate `SHA256SUMS` with `cosign verify-blob` (`SHA256SUMS.sigstore.json`) and `gh attestation verify` against `.github/workflows/release.yml@refs/tags/v<version>` before trusting the downloaded files.
+3. Run `sync-public-changelog` (and verify with `--check`):
 
 ```bash
+dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
+  sync-public-changelog --publication-base https://github.com/islamu-ngo/Event/blob/
+
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj --configuration Release -- \
   sync-public-changelog --publication-base https://github.com/islamu-ngo/Event/blob/ --check
 ```
 
-Omit `--check` to write the updated entries-only projection and `publication-manifest.v1.json`. `sync-public-changelog` binds every release directory and fragment cryptographically to its signed annotated tag tree and fails closed on post-tag edits.
+`sync-public-changelog` cryptographically verifies the SSH-signed annotated tag `v<version>`, confirms `release.yaml`, `summary.md`, and every linked `CHG-*.yaml` byte-match the signed tag's target commit tree, verifies the sealed post-tag archive (`release-artifact-manifest.v1.json`, `SHA256SUMS`, `SHA256SUMS.sigstore.json`, `release-images.v1.json`, `release-context.v1.json`, `release-notes.md`) against that exact `sourceCommitOid`, writes the updated entries-only projection and `publication-manifest.v1.json` (preserving YAML frontmatter), and fails closed on any tamper or accepted-page drift. Commit the verified sealed release archive plus `docs/public/changelog/README.md` and `docs/public/changelog/publication-manifest.v1.json` via PR so future CI `--check` runs and subsequent releases verify 100% offline.
 
 ## Failure recovery and non-atomicity rules
 
-GitHub Releases, ATCR, and GHCR do **not** commit atomically. Follow these exact recovery rules:
+GitHub Releases, GHCR, and any configured external OCI mirror do **not** commit atomically, and GitHub's REST API does not provide atomic compare-and-swap on `draft=false`. Restrict repository `contents: write` access and enforce a `v*` tag ruleset to close the authorized-editor window. Follow these exact recovery rules:
 
 | Failure point | Observable staging state | Required operator action |
 |---|---|---|
 | Failure in `preflight` | Zero images built, zero drafts, zero public release. | Fix signer enrollment, tag binding, or release inputs; never force-move an already-shared tag. |
-| Failure during `build-images` or `sign-and-attest` | One or more unadvertised digest-only OCI objects may exist in ATCR/GHCR (zero registry tags assigned; no draft or public release). | Diagnose the failure (Trivy CVE, registry outage, OIDC/Cosign error) and rerun the workflow for the same tag. Digest-only objects remain unadvertised until signed and published. |
-| Failure during `publish-release` before `--draft=false` | An unpublished draft GitHub Release with partial or complete assets may exist alongside staged digest-only OCI indexes. | Inspect the draft; rerun the workflow. `publish-release` resumes an exact matching draft without `--clobber` and rejects differing bytes or unexpected assets. If an interrupted draft contains corrupted partial assets, delete the **unpublished draft** after recording incident evidence and rerun (never delete a published release). |
+| Failure during `build-images` or `sign-and-attest` | One or more unadvertised digest-only OCI objects may exist in GHCR (and any configured external OCI mirror), with zero registry tags assigned and no draft or public release. | Diagnose the failure (Trivy CVE, registry outage, OIDC/Cosign error) and rerun failed jobs for the same tag. Digest-only objects remain unadvertised until signed and published. |
+| Failure during `publish-release` before `draft=false` | An unpublished draft GitHub Release with partial or complete assets may exist alongside staged digest-only OCI indexes. | Prefer GitHub Actions **"Re-run failed jobs"** so `publish-release` reuses the original verified `release-signed-<version>` workflow artifact without minting a second Sigstore bundle. Even on a full rerun, `publish-release` verifies all 7 deterministic assets byte-for-byte without `--clobber` and preserves an existing draft `SHA256SUMS.sigstore.json` only after independently verifying it with Cosign. If an interrupted draft contains corrupted partial assets, delete the **unpublished draft** after recording incident evidence and rerun (never delete a published release). |
+| Failure in post-publish verification (`publish-release`) | A published release diverged from the pre-publish verified snapshot or tag object. | Treat as a security incident (`append-contributors` is blocked automatically): inspect GitHub audit logs, do not silently overwrite assets, and publish a security advisory and corrective patch release. |
 | Failure in `append-contributors` | Published release is 100% valid, signed, attested, and identity-free; only the mutable contributor footer was omitted. | Optional: rerun or leave identity-free. Never rebuild, re-sign, or modify sealed assets. |
 | Defect discovered AFTER publication | Sealed release and assets are immutable. | **Never** replace assets, overwrite `SHA256SUMS`, delete/recreate the tag, or rewrite history. Publish a corrective patch release (`v<major>.<minor>.<patch+1>`) and security/operational advisory. |
 | Contributor edit or removal request | Contributor `@handle` appears only in the mutable GitHub Release page body. | Edit the GitHub Release page body directly to adjust or remove the requested handle. Signed `release-notes.md`, `SHA256SUMS`, `SHA256SUMS.sigstore.json`, and all attestations remain cryptographically valid untouched. |
 
 ## Authorized post-merge release-candidate rehearsal
 
-Source-level tests, `actionlint`, `zizmor`, and CI validators do **not** prove live GitHub OIDC, ATCR/GHCR digest-only push behavior, eight-reference Cosign verification, or draft recovery. Before declaring operational readiness for `v0.1.0`, execute this rehearsal with explicit Project Steward approval:
+Source-level tests, `actionlint`, `zizmor`, and CI validators do **not** prove live GitHub OIDC, GHCR or external OCI registry digest-only push behavior, Cosign OCI/blob verification, or draft recovery. Before declaring operational readiness for `v0.1.0`, execute this rehearsal with explicit Project Steward approval:
 
-1. Enroll the reviewed release signer key in `eng/release/trust/allowed-signers` and configure the protected `release` environment (required reviewers, tag rules, plus optional `vars.CONTAINER_REGISTRY` / `vars.CONTAINER_REGISTRY_USER` / `secrets.CONTAINER_REGISTRY_PASSWORD` if mirroring beyond GHCR).
-2. Tag a signed release candidate (for example `v0.1.0-rc.1`) targeting an approved commit with `release.yaml` and `summary.md`.
+1. Enroll the reviewed release signer key in `eng/release/trust/allowed-signers` and configure the protected `release` environment (required reviewers, `v*` tag protection + tag ruleset, plus optional `vars.CONTAINER_REGISTRY` / `vars.CONTAINER_REGISTRY_USER` / `vars.CONTAINER_REGISTRY_LOGIN_USER` / `secrets.CONTAINER_REGISTRY_PASSWORD` if mirroring beyond GHCR).
+2. Tag a signed release candidate (for example `v0.1.0-rc.1`) targeting an approved commit with `release.yaml` and `summary.md` (and confirm `deploy-coolify.yml` does NOT trigger on the tag push).
 3. **Fault-injection drill:** abort or inject a failure after digest-only staging and before signing completes. Confirm:
    - Zero public GitHub Release exists.
    - Zero mutable or version tags exist in GHCR (or any configured external OCI registry) for the staged images.
    - Residual staging state is accurately logged.
-4. **Recovery & full verification drill:** rerun the workflow for the same signed tag without replacing assets. Independently verify:
-   - `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=eng/release/trust/allowed-signers verify-tag v0.1.0-rc.1`
-   - `sha256sum --check SHA256SUMS` (offline)
-   - `cosign verify-blob --bundle SHA256SUMS.sigstore.json ... SHA256SUMS`
+4. **Recovery & full verification drill:** rerun the workflow for the same signed tag without replacing assets. Independently verify (using an independently obtained trusted `allowed-signers` copy):
+   - `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=/path/to/trusted-allowed-signers verify-tag v0.1.0-rc.1`
+   - `cosign verify-blob --bundle SHA256SUMS.sigstore.json ... SHA256SUMS` (authenticate `SHA256SUMS` FIRST)
+   - `sha256sum --check SHA256SUMS` (verify assets against the authenticated checksums)
    - `cosign verify` on **every** canonical `registry/repository@sha256:<digest>` reference listed in `release-artifact-manifest.v1.json` (4 in GHCR-only mode; 8 when a secondary registry is configured)
    - `gh attestation verify` on all seven attested files and all four GHCR OCI digests
-   - Re-triggering the workflow on the already-published tag exits `0` at `preflight` as an idempotent no-op with zero container builds.
+   - Re-triggering the workflow on the already-published tag exits `0` at `preflight` as an idempotent no-op with zero container builds (even when mirror credentials are absent).
    - Contributor API failure/omission preserves the valid identity-free release.

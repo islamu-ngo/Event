@@ -1,7 +1,6 @@
-using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using ISLAMU.ReleaseEngineering;
+using TUnit.Assertions.Enums;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
 
@@ -10,6 +9,13 @@ public sealed class ReleaseArtifactManifestTests
     private const string SampleVersion = "1.1.0";
     private const string SampleTag = "v1.1.0";
     private static readonly string SampleCommitOid = new('a', 40);
+
+    // Independently computed with GNU sha256sum against ArtifactSealFixture's fixed UTF-8 LF fixture bytes.
+    private const string ExpectedContractDiffSha256 = "1fdccf02cfd6ba6705f4055eaa700b6d4ab75c7ad06968558251e6a301eb2020";
+    private const string ExpectedReleaseContextSha256 = "6209e265e18d3f4de6244e4d039b5298433a4698d328e1c050451c16e3ad0a40";
+    private const string ExpectedReleaseImagesSha256 = "074ce75e29578501033433d557b54f3512eb1319c6001bd29581dc2939002170";
+    private const string ExpectedReleaseNotesSha256 = "1fc166c3489b0d072de3a5957b7f8e54e5dcd91b2b6b0bd8a138db31ef07dbfb";
+    private const string ExpectedRenderingContextSha256 = "c1b5eb41bd936be5c9936a54cfcb6de7618ce09e623e68785dcc4172e9a4a354";
 
     [Test]
     public async Task SealsExactArtifactInventoryWithSortedChecksumsAndEightCanonicalRegistryReferences()
@@ -35,20 +41,21 @@ public sealed class ReleaseArtifactManifestTests
         await Assert.That(manifest.Files.Select(f => f.RelativePath).ToArray())
             .IsEquivalentTo(
             [
-                "contract-diff.v1.json",
-                "release-context.v1.json",
-                "release-images.v1.json",
-                "release-notes.md",
-                "release-rendering-context.v1.json",
-            ]);
+                ReleaseArtifactManifest.ContractDiffFileName,
+                ReleaseArtifactManifest.ReleaseContextFileName,
+                ReleaseArtifactManifest.ReleaseImagesFileName,
+                ReleaseArtifactManifest.ReleaseNotesFileName,
+                ReleaseArtifactManifest.RenderingContextFileName,
+            ],
+            CollectionOrdering.Matching);
         await Assert.That(manifest.Images).Count().IsEqualTo(4);
         await Assert.That(manifest.Images.Select(i => i.ImageName).ToArray())
-            .IsEquivalentTo(["api", "blazor", "migration", "standalone"]);
+            .IsEquivalentTo(["api", "blazor", "migration", "standalone"], CollectionOrdering.Matching);
         await Assert.That(manifest.Images.Sum(i => i.CanonicalReferences.Count)).IsEqualTo(8);
-        foreach (EnrichedImageReference image in manifest.Images)
+        foreach (IReadOnlyList<string> references in manifest.Images.Select(image => image.CanonicalReferences))
         {
-            await Assert.That(image.CanonicalReferences.Any(r => r.StartsWith("atcr.io/", StringComparison.Ordinal))).IsTrue();
-            await Assert.That(image.CanonicalReferences.Any(r => r.StartsWith("ghcr.io/", StringComparison.Ordinal))).IsTrue();
+            await Assert.That(references.Any(r => r.StartsWith("atcr.io/", StringComparison.Ordinal))).IsTrue();
+            await Assert.That(references.Any(r => r.StartsWith("ghcr.io/", StringComparison.Ordinal))).IsTrue();
         }
 
         string checksumsPath = Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.ChecksumsFileName);
@@ -64,21 +71,13 @@ public sealed class ReleaseArtifactManifestTests
 
         string[] lines = checksumText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         await Assert.That(lines).Count().IsEqualTo(6);
-        string[] expectedOrder =
-        [
-            "contract-diff.v1.json",
-            "release-artifact-manifest.v1.json",
-            "release-context.v1.json",
-            "release-images.v1.json",
-            "release-notes.md",
-            "release-rendering-context.v1.json",
-        ];
-        for (int index = 0; index < expectedOrder.Length; index++)
-        {
-            string filePath = Path.Combine(fixture.ArtifactDirectory, expectedOrder[index]);
-            string expectedHash = Convert.ToHexStringLower(SHA256.HashData(await File.ReadAllBytesAsync(filePath)));
-            await Assert.That(lines[index]).IsEqualTo($"{expectedHash}  {expectedOrder[index]}");
-        }
+        await Assert.That(lines[0]).IsEqualTo($"{ExpectedContractDiffSha256}  {ReleaseArtifactManifest.ContractDiffFileName}");
+        await Assert.That(lines[1]).EndsWith($"  {ReleaseArtifactManifest.ManifestFileName}");
+        await Assert.That(lines[1].Split("  ", StringSplitOptions.None)[0]).Length().IsEqualTo(64);
+        await Assert.That(lines[2]).IsEqualTo($"{ExpectedReleaseContextSha256}  {ReleaseArtifactManifest.ReleaseContextFileName}");
+        await Assert.That(lines[3]).IsEqualTo($"{ExpectedReleaseImagesSha256}  {ReleaseArtifactManifest.ReleaseImagesFileName}");
+        await Assert.That(lines[4]).IsEqualTo($"{ExpectedReleaseNotesSha256}  {ReleaseArtifactManifest.ReleaseNotesFileName}");
+        await Assert.That(lines[5]).IsEqualTo($"{ExpectedRenderingContextSha256}  {ReleaseArtifactManifest.RenderingContextFileName}");
     }
 
     [Test]
@@ -86,7 +85,7 @@ public sealed class ReleaseArtifactManifestTests
     {
         using var fixture = new ArtifactSealFixture();
         await File.WriteAllTextAsync(
-            Path.Combine(fixture.ArtifactDirectory, "release-images.v1.json"),
+            Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseImagesFileName),
             ReleaseImageManifestTests.ValidSingleRegistryManifestJson("ghcr.io", "islamu-ngo", SampleVersion, SampleCommitOid) + "\n");
 
         ReleaseArtifactSealResult result = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
@@ -98,11 +97,71 @@ public sealed class ReleaseArtifactManifestTests
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "valid ghcr-only seal");
         await Assert.That(result.Manifest!.Images).Count().IsEqualTo(4);
         await Assert.That(result.Manifest.Images.Sum(i => i.CanonicalReferences.Count)).IsEqualTo(4);
-        foreach (EnrichedImageReference image in result.Manifest.Images)
+        foreach (IReadOnlyList<string> references in result.Manifest.Images.Select(image => image.CanonicalReferences))
         {
-            await Assert.That(image.CanonicalReferences).Count().IsEqualTo(1);
-            await Assert.That(image.CanonicalReferences[0]).StartsWith("ghcr.io/");
+            await Assert.That(references).Count().IsEqualTo(1);
+            await Assert.That(references[0]).StartsWith("ghcr.io/");
         }
+    }
+
+    [Test]
+    public async Task SealsOciDoubleUnderscoreAndConsecutiveHyphenNamespacesAndVerifiesSealedDirectory()
+    {
+        using var fixture = new ArtifactSealFixture();
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseImagesFileName),
+            ReleaseImageManifestTests.ValidManifestJson(
+                SampleVersion,
+                SampleCommitOid,
+                secondaryRegistry: "registry.example.com",
+                secondaryOwner: "team__events/my--org") + "\n");
+
+        ReleaseArtifactSealResult sealedResult = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
+            fixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid));
+        await Assert.That(sealedResult.IsValid).IsTrue().Because(sealedResult.Diagnostic ?? "valid OCI separators");
+
+        ReleaseArtifactVerificationResult verifiedWithoutBundle = ReleaseArtifactManifest.VerifySealedDirectory(
+            fixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid,
+            requireSigstoreBundle: false);
+        await Assert.That(verifiedWithoutBundle.IsValid).IsTrue().Because(verifiedWithoutBundle.Diagnostic ?? "valid sealed directory");
+
+        ReleaseArtifactVerificationResult missingBundle = ReleaseArtifactManifest.VerifySealedDirectory(
+            fixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid,
+            requireSigstoreBundle: true);
+        await Assert.That(missingBundle.IsValid).IsFalse();
+        await Assert.That(missingBundle.Diagnostic).IsEqualTo($"artifact_manifest_missing_file:{ReleaseArtifactManifest.SigstoreBundleFileName}");
+
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.SigstoreBundleFileName),
+            """{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}""" + "\n");
+        ReleaseArtifactVerificationResult verifiedWithBundle = ReleaseArtifactManifest.VerifySealedDirectory(
+            fixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid,
+            requireSigstoreBundle: true);
+        await Assert.That(verifiedWithBundle.IsValid).IsTrue().Because(verifiedWithBundle.Diagnostic ?? "valid with bundle");
+
+        await File.AppendAllTextAsync(
+            Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseNotesFileName),
+            "\nTampered line.\n");
+        ReleaseArtifactVerificationResult tampered = ReleaseArtifactManifest.VerifySealedDirectory(
+            fixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid,
+            requireSigstoreBundle: true);
+        await Assert.That(tampered.IsValid).IsFalse();
+        await Assert.That(tampered.Diagnostic).IsEqualTo("artifact_manifest_verification_mismatch");
     }
 
     [Test]
@@ -128,9 +187,9 @@ public sealed class ReleaseArtifactManifestTests
         await Assert.That(first.IsValid).IsTrue().Because(first.Diagnostic ?? "first seal");
         await Assert.That(second.IsValid).IsTrue().Because(second.Diagnostic ?? "second seal");
         await Assert.That(await File.ReadAllBytesAsync(Path.Combine(outputA, ReleaseArtifactManifest.ChecksumsFileName)))
-            .IsEquivalentTo(await File.ReadAllBytesAsync(Path.Combine(outputB, ReleaseArtifactManifest.ChecksumsFileName)));
+            .IsEquivalentTo(await File.ReadAllBytesAsync(Path.Combine(outputB, ReleaseArtifactManifest.ChecksumsFileName)), CollectionOrdering.Matching);
         await Assert.That(await File.ReadAllBytesAsync(Path.Combine(outputA, ReleaseArtifactManifest.ManifestFileName)))
-            .IsEquivalentTo(await File.ReadAllBytesAsync(Path.Combine(outputB, ReleaseArtifactManifest.ManifestFileName)));
+            .IsEquivalentTo(await File.ReadAllBytesAsync(Path.Combine(outputB, ReleaseArtifactManifest.ManifestFileName)), CollectionOrdering.Matching);
     }
 
     [Test]
@@ -152,7 +211,7 @@ public sealed class ReleaseArtifactManifestTests
 
         await Assert.That(clobberChecksums.IsValid).IsFalse();
         await Assert.That(clobberChecksums.Diagnostic).IsEqualTo("artifact_manifest_output_exists");
-        await Assert.That(await File.ReadAllBytesAsync(existingChecksums)).IsEquivalentTo(sentinelBytes);
+        await Assert.That(await File.ReadAllBytesAsync(existingChecksums)).IsEquivalentTo(sentinelBytes, CollectionOrdering.Matching);
         await Assert.That(File.Exists(Path.Combine(outputDir, ReleaseArtifactManifest.ManifestFileName))).IsFalse();
 
         ReleaseArtifactSealResult initialInPlace = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
@@ -171,15 +230,15 @@ public sealed class ReleaseArtifactManifestTests
         await Assert.That(secondInPlace.IsValid).IsFalse();
         await Assert.That(secondInPlace.Diagnostic).IsEqualTo("artifact_manifest_output_exists");
         await Assert.That(await File.ReadAllBytesAsync(Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.ManifestFileName)))
-            .IsEquivalentTo(sealedManifestBytes);
+            .IsEquivalentTo(sealedManifestBytes, CollectionOrdering.Matching);
     }
 
     [Test]
-    [Arguments("contract-diff.v1.json")]
-    [Arguments("release-context.v1.json")]
-    [Arguments("release-images.v1.json")]
-    [Arguments("release-notes.md")]
-    [Arguments("release-rendering-context.v1.json")]
+    [Arguments(ReleaseArtifactManifest.ContractDiffFileName)]
+    [Arguments(ReleaseArtifactManifest.ReleaseContextFileName)]
+    [Arguments(ReleaseArtifactManifest.ReleaseImagesFileName)]
+    [Arguments(ReleaseArtifactManifest.ReleaseNotesFileName)]
+    [Arguments(ReleaseArtifactManifest.RenderingContextFileName)]
     public async Task RejectsMissingRequiredArtifactFile(string missingFileName)
     {
         using var fixture = new ArtifactSealFixture();
@@ -223,7 +282,7 @@ public sealed class ReleaseArtifactManifestTests
     }
 
     [Test]
-    public async Task RejectsSymlinksPathTraversalAndNestedOutputDirectories()
+    public async Task RejectsSymlinksPathTraversalAndNestedOutputDirectoriesIncludingDotPrefixedChildren()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -233,7 +292,7 @@ public sealed class ReleaseArtifactManifestTests
         using var fixture = new ArtifactSealFixture();
         string outsideFile = Path.Combine(fixture.Root, "outside-notes.md");
         await File.WriteAllTextAsync(outsideFile, "# Release 1.1.0\n\nValid notes.\n");
-        string notesPath = Path.Combine(fixture.ArtifactDirectory, "release-notes.md");
+        string notesPath = Path.Combine(fixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseNotesFileName);
         File.Delete(notesPath);
         File.CreateSymbolicLink(notesPath, outsideFile);
 
@@ -279,11 +338,30 @@ public sealed class ReleaseArtifactManifestTests
         await Assert.That(nestedOut.IsValid).IsFalse();
         await Assert.That(nestedOut.Diagnostic).IsEqualTo("artifact_manifest_output_invalid");
 
+        string doubleDotNestedOutput = Path.Combine(dirLinkFixture.ArtifactDirectory, "..sealed");
+        ReleaseArtifactSealResult doubleDotNestedOut = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
+            dirLinkFixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid,
+            doubleDotNestedOutput));
+        await Assert.That(doubleDotNestedOut.IsValid).IsFalse();
+        await Assert.That(doubleDotNestedOut.Diagnostic).IsEqualTo("artifact_manifest_output_invalid");
+
+        string doubleDotSiblingOutput = Path.Combine(dirLinkFixture.Root, "..sealed");
+        ReleaseArtifactSealResult doubleDotSiblingOut = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
+            dirLinkFixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid,
+            doubleDotSiblingOutput));
+        await Assert.That(doubleDotSiblingOut.IsValid).IsTrue().Because(doubleDotSiblingOut.Diagnostic ?? "valid sibling output");
+
         await Assert.That(ReleaseArtifactManifest.IsSafeRelativeArtifactPath("../escape.json")).IsFalse();
         await Assert.That(ReleaseArtifactManifest.IsSafeRelativeArtifactPath("/etc/passwd")).IsFalse();
         await Assert.That(ReleaseArtifactManifest.IsSafeRelativeArtifactPath("nested\\file.json")).IsFalse();
         await Assert.That(ReleaseArtifactManifest.IsSafeRelativeArtifactPath("nested/file.json")).IsFalse();
-        await Assert.That(ReleaseArtifactManifest.IsSafeRelativeArtifactPath("release-notes.md")).IsTrue();
+        await Assert.That(ReleaseArtifactManifest.IsSafeRelativeArtifactPath(ReleaseArtifactManifest.ReleaseNotesFileName)).IsTrue();
     }
 
     [Test]
@@ -292,7 +370,7 @@ public sealed class ReleaseArtifactManifestTests
         using var taggedFixture = new ArtifactSealFixture();
         string badTaggedJson = ReleaseImageManifestTests.ValidManifestJson(SampleVersion, SampleCommitOid)
             .Replace($"@sha256:{new string('1', 64)}", ":v1.1.0", StringComparison.Ordinal);
-        await File.WriteAllTextAsync(Path.Combine(taggedFixture.ArtifactDirectory, "release-images.v1.json"), badTaggedJson);
+        await File.WriteAllTextAsync(Path.Combine(taggedFixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseImagesFileName), badTaggedJson);
 
         ReleaseArtifactSealResult taggedResult = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
             taggedFixture.ArtifactDirectory,
@@ -305,7 +383,7 @@ public sealed class ReleaseArtifactManifestTests
         using var singleRegistryFixture = new ArtifactSealFixture();
         string singleRegistryJson = ReleaseImageManifestTests.ValidManifestJson(SampleVersion, SampleCommitOid)
             .Replace($"\"atcr.io/islamu-ngo/event-api@sha256:{new string('1', 64)}\",", string.Empty, StringComparison.Ordinal);
-        await File.WriteAllTextAsync(Path.Combine(singleRegistryFixture.ArtifactDirectory, "release-images.v1.json"), singleRegistryJson);
+        await File.WriteAllTextAsync(Path.Combine(singleRegistryFixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseImagesFileName), singleRegistryJson);
 
         ReleaseArtifactSealResult singleRegistryResult = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
             singleRegistryFixture.ArtifactDirectory,
@@ -338,7 +416,7 @@ public sealed class ReleaseArtifactManifestTests
     {
         using var leakFixture = new ArtifactSealFixture();
         await File.WriteAllTextAsync(
-            Path.Combine(leakFixture.ArtifactDirectory, "release-notes.md"),
+            Path.Combine(leakFixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseNotesFileName),
             "# Release 1.1.0\n\nContact maintainer@example.org for details.\n");
 
         ReleaseArtifactSealResult leaked = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
@@ -351,7 +429,7 @@ public sealed class ReleaseArtifactManifestTests
 
         using var contextMismatchFixture = new ArtifactSealFixture();
         await File.WriteAllTextAsync(
-            Path.Combine(contextMismatchFixture.ArtifactDirectory, "release-context.v1.json"),
+            Path.Combine(contextMismatchFixture.ArtifactDirectory, ReleaseArtifactManifest.ReleaseContextFileName),
             """{"schemaVersion":1,"release":{"version":"9.9.9"}}""" + "\n");
 
         ReleaseArtifactSealResult mismatchedContext = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
@@ -363,7 +441,7 @@ public sealed class ReleaseArtifactManifestTests
         await Assert.That(mismatchedContext.Diagnostic).IsEqualTo("artifact_manifest_context_invalid");
 
         using var emptyFixture = new ArtifactSealFixture();
-        await File.WriteAllBytesAsync(Path.Combine(emptyFixture.ArtifactDirectory, "contract-diff.v1.json"), []);
+        await File.WriteAllBytesAsync(Path.Combine(emptyFixture.ArtifactDirectory, ReleaseArtifactManifest.ContractDiffFileName), []);
 
         ReleaseArtifactSealResult emptyResult = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
             emptyFixture.ArtifactDirectory,
@@ -384,7 +462,7 @@ public sealed class ReleaseArtifactManifestTests
             Directory.CreateDirectory(ArtifactDirectory);
 
             File.WriteAllText(
-                Path.Combine(ArtifactDirectory, "contract-diff.v1.json"),
+                Path.Combine(ArtifactDirectory, ReleaseArtifactManifest.ContractDiffFileName),
                 $$"""
                 {
                   "baseOid": "{{new string('0', 40)}}",
@@ -403,7 +481,7 @@ public sealed class ReleaseArtifactManifestTests
                 new UTF8Encoding(false));
 
             File.WriteAllText(
-                Path.Combine(ArtifactDirectory, "release-context.v1.json"),
+                Path.Combine(ArtifactDirectory, ReleaseArtifactManifest.ReleaseContextFileName),
                 $$"""
                 {
                   "changes": [],
@@ -421,17 +499,17 @@ public sealed class ReleaseArtifactManifestTests
                 new UTF8Encoding(false));
 
             File.WriteAllText(
-                Path.Combine(ArtifactDirectory, "release-images.v1.json"),
+                Path.Combine(ArtifactDirectory, ReleaseArtifactManifest.ReleaseImagesFileName),
                 ReleaseImageManifestTests.ValidManifestJson(version, oid) + "\n",
                 new UTF8Encoding(false));
 
             File.WriteAllText(
-                Path.Combine(ArtifactDirectory, "release-notes.md"),
+                Path.Combine(ArtifactDirectory, ReleaseArtifactManifest.ReleaseNotesFileName),
                 $"# Release {version}\n\n## Community Admin\n\n- **events**: Add schedule export (`{oid[..12]}`)\n",
                 new UTF8Encoding(false));
 
             File.WriteAllText(
-                Path.Combine(ArtifactDirectory, "release-rendering-context.v1.json"),
+                Path.Combine(ArtifactDirectory, ReleaseArtifactManifest.RenderingContextFileName),
                 $$"""
                 [
                   {

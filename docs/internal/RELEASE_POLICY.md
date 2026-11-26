@@ -135,21 +135,26 @@ ordered families:
    are the sole human-owned per-release inputs committed before tagging. First-release baseline
    descriptors (`changelog-baseline-YYYY-MM-DD`) verify directly through `GitTagSignatureVerifier`
    and fail closed once any stable SemVer tag is reachable.
-2. **Pre-build verification and non-clobber guard:** before any container image builds,
-   `.github/workflows/release.yml` MUST run under the protected `release` environment and
-   per-tag non-cancelling concurrency (`cancel-in-progress: false`), verify the signed annotated
-   tag via `verify-release-tag --event-sha`, and query GitHub Releases explicitly (HTTP `404`
-   = absent; HTTP `200` = verify existing sealed release cryptographically as an idempotent
-   no-op or fail closed; any other HTTP status = fail closed). Existing published releases MUST
-   NEVER be replaced or overwritten.
+2. **Pre-build verification, tag exclusivity, and non-clobber guard:** governed release tags
+   (`v*`) MUST trigger `.github/workflows/release.yml` exclusively (never `deploy-coolify.yml`).
+   Before any container image builds or mirror credential check, `.github/workflows/release.yml`
+   MUST run under the protected `release` environment and per-tag non-cancelling concurrency
+   (`cancel-in-progress: false`), verify the signed annotated tag via `verify-release-tag --event-sha`,
+   and query GitHub Releases explicitly (HTTP `404` = absent; HTTP `200` = verify existing sealed
+   release cryptographically as an idempotent no-op without requiring mirror credentials, or fail
+   closed; any other HTTP status = fail closed). Existing published releases MUST NEVER be replaced
+   or overwritten.
 3. **Digest-only container staging before note rendering:** four multi-arch `.NET 10` OCI indexes
    (`islamu-event-api`, `islamu-event-ui`, `islamu-event-standalone`, `islamu-event-migration-service`)
    MUST be built, Trivy-scanned, SBOM/SLSA-attested, and staged via `_container-build.yml` in
    `push-mode: digest-only` (`push=true,push-by-digest=true,name-canonical=true`), assigning ZERO
-   mutable or version registry tags. GHCR (`ghcr.io/<owner>`) is the built-in primary registry
-   (authenticated with `GITHUB_TOKEN`); an optional secondary OCI registry mirror (for example
-   ATCR, Quay, or another OCI-compliant registry) is configured strictly through GitHub Variables
-   (`vars.CONTAINER_REGISTRY`, `vars.CONTAINER_REGISTRY_USER`) and Secret
+   mutable or version registry tags. GHCR (`ghcr.io/<repo-owner>`, always using the lowercase
+   repository owner) is the built-in primary registry (authenticated with `GITHUB_TOKEN`); an
+   optional secondary OCI registry mirror (for example Docker Hub, Quay, ATCR, or another
+   OCI-compliant registry) is configured strictly through GitHub Variables (`vars.CONTAINER_REGISTRY`,
+   `vars.CONTAINER_REGISTRY_USER` for the OCI repository namespace with OCI Distribution Spec
+   separators, and optional `vars.CONTAINER_REGISTRY_LOGIN_USER` when login identity differs from
+   the repository namespace such as Quay robot accounts or Docker Hub orgs) and Secret
    (`secrets.CONTAINER_REGISTRY_PASSWORD`) with zero hardcoded personal handles or forced third-party
    hosts in workflow YAML. Only after all four digests and all canonical `registry/repository@sha256:<digest>`
    references (4 in GHCR-only mode; 8 when a secondary registry is configured) are collected in
@@ -169,21 +174,34 @@ ordered families:
      **every** published canonical `registry/repository@sha256:<digest>` reference across every
      configured registry individually (a GHCR signature does not authenticate a mirror reference)
      and signs `SHA256SUMS` with `cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json`.
-5. **Verified draft publish-once & non-atomicity honesty:**
+5. **Verified draft publish-once, tag-object binding, and non-atomicity honesty:**
    - Exact eight release assets (six files covered by `SHA256SUMS`, `SHA256SUMS`, and
      `SHA256SUMS.sigstore.json`) upload to a draft GitHub Release without `--clobber`, are
-     re-downloaded and verified byte-for-byte against `SHA256SUMS`, and are published once
-     (`gh release edit --draft=false`).
-   - GitHub and two container registries do NOT commit atomically. Interrupted runs may leave
-     unadvertised digest-only registry objects or an unpublished draft release; reruns verify
-     exact matching state or fail closed without clobbering.
+     re-downloaded and verified byte-for-byte against `SHA256SUMS` and `cosign verify-blob`,
+     re-checked against the remote annotated `tag-object-id` and exact draft asset identity
+     snapshot `(id, name, size, updated_at, digest)`, published once by numeric draft release ID
+     (`PATCH /releases/<id>` `draft=false`), and immediately re-verified post-publish.
+   - Publication-only retries SHOULD reuse the original verified `release-signed-<version>`
+     workflow artifact via "Re-run failed jobs"; even on a full rerun after partial draft upload,
+     differing deterministic assets fail closed without clobbering and an existing draft
+     `SHA256SUMS.sigstore.json` is preserved only if it independently passes Cosign OIDC verification.
+   - GitHub and container registries do NOT commit atomically, and GitHub's API does not provide
+     atomic compare-and-swap on `draft=false`. Restricting `contents: write` access and enforcing
+     a `v*` tag ruleset with reviewed minimal bypass actors is required to close the authorized-editor
+     and tag-mutation window. Interrupted runs may leave unadvertised digest-only registry objects
+     or an unpublished draft that reruns verify or fail closed without clobbering.
    - A published release is immutable. Corrections require a new version release and advisory,
      never asset replacement or tag re-pointing.
    - SBOM and SLSA provenance establish build origin and contents, NOT byte-for-byte container
      reproducibility (no reproducible-container claim is made without a two-build equality check).
 6. **Offline vs. online verification boundary:**
-   - `git verify-tag`, `verify-release-tag`, and `sha256sum --check SHA256SUMS` verify tag
-     signatures and file integrity **offline**.
+   - `git verify-tag` and `verify-release-tag` verify tag signatures **offline**, provided the
+     verifier obtains `allowed-signers` (or SSH key fingerprints) from an independent trusted source
+     rather than the untrusted checkout being verified.
+   - `sha256sum --check SHA256SUMS` verifies file checksum consistency **offline**, but does NOT
+     authenticate post-build release assets on its own; adopters MUST authenticate `SHA256SUMS`
+     with `cosign verify-blob --bundle SHA256SUMS.sigstore.json` (or an out-of-band trusted copy)
+     before trusting checksums.
    - `cosign verify`, `cosign verify-blob`, and `gh attestation verify` verify OIDC signer
      identity, Fulcio/Rekor transparency proofs, and GitHub SLSA provenance and normally
      require network access to trust roots / registries / GitHub APIs.
@@ -214,6 +232,9 @@ managed by `sync-public-changelog` (`PublicChangelogPolicy`, sentinel markers
 optional YAML frontmatter only outside the markers). General adopter upgrade and verification
 guidance lives separately in
 [Releases and Changelog](../public/documentation/readme/configuration-and-operations/releases-and-changelog.md).
-`sync-public-changelog` cryptographically binds every included release directory and linked
-fragment to the exact signed annotated tag tree in Git and fails closed on post-tag edits or
-accepted-page drift.
+`sync-public-changelog` cryptographically verifies every release's signed annotated tag
+(`release.yaml`, `summary.md`, and linked `CHG-*.yaml` fragments MUST byte-match the signed tag
+tree) and supports both pre-tag committed artifacts and post-tag sealed archives from
+`release.yml` (verifying `release-artifact-manifest.v1.json`, `SHA256SUMS`, `SHA256SUMS.sigstore.json`,
+and `release-images.v1.json` against the signed tag's exact `sourceCommitOid` without moving the tag),
+failing closed on post-tag tampering or accepted-page drift.

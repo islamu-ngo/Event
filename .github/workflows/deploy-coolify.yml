@@ -20,7 +20,6 @@ on:
         type: string
   push:
     branches: [main]
-    tags: ["v*"]
     paths-ignore:
       # AI / tool configuration directories
       - ".agents/**"
@@ -99,37 +98,7 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       both_changed: ${{ steps.check-both.outputs.both_changed }}
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-      registry: ${{ steps.resolve-registry.outputs.registry }}
-      registry-user: ${{ steps.resolve-registry.outputs.registry-user }}
     steps:
-      - name: Resolve container registry configuration
-        id: resolve-registry
-        shell: bash
-        env:
-          CONFIGURED_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
-          CONFIGURED_REGISTRY_USER: ${{ vars.CONTAINER_REGISTRY_USER }}
-          REPO_OWNER: ${{ github.repository_owner }}
-        run: |
-          set -euo pipefail
-          trimmed_registry="${CONFIGURED_REGISTRY#"${CONFIGURED_REGISTRY%%[![:space:]]*}"}"
-          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
-          registry="${trimmed_registry,,}"
-          trimmed_user="${CONFIGURED_REGISTRY_USER#"${CONFIGURED_REGISTRY_USER%%[![:space:]]*}"}"
-          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
-          registry_user="${trimmed_user,,}"
-
-          if [[ -z "${registry}" || "${registry}" == "ghcr.io" ]]; then
-            registry="ghcr.io"
-            registry_user="${registry_user:-${REPO_OWNER,,}}"
-          elif [[ -z "${registry_user}" ]]; then
-            echo "vars.CONTAINER_REGISTRY_USER is required when vars.CONTAINER_REGISTRY='${registry}'." >&2
-            exit 1
-          fi
-
-          {
-            echo "registry=${registry}"
-            echo "registry-user=${registry_user}"
-          } >> "$GITHUB_OUTPUT"
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -139,7 +108,6 @@ jobs:
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
-          base: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           filters: |
             ui:
               - 'src/Explore.Blazor/**'
@@ -172,11 +140,9 @@ jobs:
         env:
           API_CHANGED: ${{ steps.filter.outputs.api }}
           UI_CHANGED: ${{ steps.filter.outputs.ui }}
-          IS_TAG_REF: ${{ github.ref_type == 'tag' }}
           IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          # Both changed if: (api AND ui) OR it's a tag push
-          if [ "$IS_MANUAL" == "true" ] || [ "$IS_TAG_REF" == "true" ] || { [ "$API_CHANGED" == "true" ] && [ "$UI_CHANGED" == "true" ]; }; then
+          if [ "$IS_MANUAL" == "true" ] || { [ "$API_CHANGED" == "true" ] && [ "$UI_CHANGED" == "true" ]; }; then
             echo "both_changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "both_changed=false" >> "$GITHUB_OUTPUT"
@@ -187,16 +153,15 @@ jobs:
         env:
           API_CHANGED: ${{ steps.filter.outputs.api }}
           UI_CHANGED: ${{ steps.filter.outputs.ui }}
-          REF_TYPE: ${{ github.ref_type }}
           IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           MATRIX_JSON="[]"
 
-          if [ "$IS_MANUAL" == "true" ] || [ "$API_CHANGED" == "true" ] || [ "$REF_TYPE" == "tag" ]; then
+          if [ "$IS_MANUAL" == "true" ] || [ "$API_CHANGED" == "true" ]; then
             MATRIX_JSON=$(echo "$MATRIX_JSON" | jq '. + [{"image-name": "islamu-event-api", "dockerfile": "src/Explore.API/Dockerfile", "context": "."}]')
           fi
 
-          if [ "$IS_MANUAL" == "true" ] || [ "$UI_CHANGED" == "true" ] || [ "$REF_TYPE" == "tag" ]; then
+          if [ "$IS_MANUAL" == "true" ] || [ "$UI_CHANGED" == "true" ]; then
             MATRIX_JSON=$(echo "$MATRIX_JSON" | jq '. + [{"image-name": "islamu-event-ui", "dockerfile": "src/Explore.Blazor/Dockerfile", "context": "."}]')
           fi
 
@@ -205,7 +170,7 @@ jobs:
   # JOB 2: Run Tests (Unified)
   run-tests:
     needs: detect-changes
-    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.ui == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/_build-test.yml
     with:
       run-integration-tests: true
@@ -230,14 +195,11 @@ jobs:
       image-name: ${{ matrix.image-name }}
       dockerfile: ${{ matrix.dockerfile }}
       context: ${{ matrix.context }}
-      registry: ${{ needs.detect-changes.outputs.registry }}
-      registry-user: ${{ needs.detect-changes.outputs.registry-user }}
+      environment: production
       build-configuration: Release
       metadata-tags: |
         type=raw,value=latest
         type=raw,value=sha-${{ github.sha }}
-        type=semver,pattern={{version}}
-        type=semver,pattern={{major}}.{{minor}}
     secrets:
       CONTAINER_REGISTRY_PASSWORD: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
@@ -270,14 +232,60 @@ jobs:
           path: artifacts/container-build
           merge-multiple: true
 
+      - name: Resolve production container registry configuration
+        id: resolve-registry
+        shell: bash
+        env:
+          CONFIGURED_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          CONFIGURED_REGISTRY_USER: ${{ vars.CONTAINER_REGISTRY_USER }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          trimmed_registry="${CONFIGURED_REGISTRY#"${CONFIGURED_REGISTRY%%[![:space:]]*}"}"
+          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
+          registry="${trimmed_registry,,}"
+          trimmed_user="${CONFIGURED_REGISTRY_USER#"${CONFIGURED_REGISTRY_USER%%[![:space:]]*}"}"
+          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
+          registry_user="${trimmed_user,,}"
+
+          if [[ -z "${registry}" || "${registry}" == "ghcr.io" ]]; then
+            registry="ghcr.io"
+            registry_user="${REPO_OWNER,,}"
+          elif [[ -z "${registry_user}" ]]; then
+            echo "vars.CONTAINER_REGISTRY_USER is required when vars.CONTAINER_REGISTRY='${registry}'." >&2
+            exit 1
+          fi
+
+          shopt -s nullglob
+          promotion_files=(artifacts/container-build/*-promotion.json)
+          if [[ "${#promotion_files[@]}" -eq 0 ]]; then
+            echo "No container promotion evidence found under artifacts/container-build." >&2
+            exit 1
+          fi
+
+          expected_prefix="${registry}/${registry_user}/"
+          for promotion_file in "${promotion_files[@]}"; do
+            actual_registry="$(jq -r '.registry' "${promotion_file}")"
+            actual_repo="$(jq -r '.repository' "${promotion_file}")"
+            if [[ "${actual_registry}" != "${registry}" || "${actual_repo}" != "${expected_prefix}"* ]]; then
+              echo "Container build promotion evidence '${promotion_file}' targeted '${actual_repo}', which does not match production registry '${expected_prefix}'." >&2
+              exit 1
+            fi
+          done
+
+          {
+            echo "registry=${registry}"
+            echo "registry-user=${registry_user}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Resolve API deploy image evidence
         id: api-evidence
-        if: ${{ needs.detect-changes.outputs.api == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ needs.detect-changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch' }}
         run: dotnet run .ci/scripts/resolve-deploy-image-evidence.cs -- artifacts/container-build islamu-event-api sha-
 
       - name: Resolve UI deploy image evidence
         id: ui-evidence
-        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.event_name == 'workflow_dispatch' }}
         run: dotnet run .ci/scripts/resolve-deploy-image-evidence.cs -- artifacts/container-build islamu-event-ui sha-
 
       - name: Download authenticated publication receipt
@@ -300,7 +308,7 @@ jobs:
             "$PDP_ENDPOINT" cerbos/policies
 
       - name: Trigger Coolify Deployment (API)
-        if: ${{ needs.detect-changes.outputs.api == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ needs.detect-changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch' }}
         uses: ./.ci/actions/deploy-coolify
         with:
           environment-name: production
@@ -308,8 +316,8 @@ jobs:
           coolify-webhook: ${{ secrets.COOLIFY_DEPLOY_API_WEBHOOK }}
           coolify-token: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
           smoke-base-url: ${{ vars.PRODUCTION_API_URL }}
-          registry: ${{ needs.detect-changes.outputs.registry }}
-          registry-user: ${{ needs.detect-changes.outputs.registry-user }}
+          registry: ${{ steps.resolve-registry.outputs.registry }}
+          registry-user: ${{ steps.resolve-registry.outputs.registry-user }}
           image-name: islamu-event-api
           immutable-tag-prefix: sha-
           expected-image-digest: ${{ steps.api-evidence.outputs.expected-image-digest }}
@@ -319,7 +327,7 @@ jobs:
           require-smoke-check: "true"
 
       - name: Recheck publication before the UI deployment
-        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.event_name == 'workflow_dispatch' }}
         shell: bash
         env:
           PUBLIC_KEY: ${{ vars.CERBOS_PUBLICATION_PUBLIC_KEY_PEM }}
@@ -333,7 +341,7 @@ jobs:
             "$PDP_ENDPOINT" cerbos/policies
 
       - name: Trigger Coolify Deployment (UI)
-        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ needs.detect-changes.outputs.ui == 'true' || github.event_name == 'workflow_dispatch' }}
         uses: ./.ci/actions/deploy-coolify
         with:
           environment-name: production
@@ -341,8 +349,8 @@ jobs:
           coolify-webhook: ${{ secrets.COOLIFY_DEPLOY_UI_WEBHOOK }}
           coolify-token: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
           smoke-base-url: ${{ vars.PRODUCTION_UI_URL }}
-          registry: ${{ needs.detect-changes.outputs.registry }}
-          registry-user: ${{ needs.detect-changes.outputs.registry-user }}
+          registry: ${{ steps.resolve-registry.outputs.registry }}
+          registry-user: ${{ steps.resolve-registry.outputs.registry-user }}
           image-name: islamu-event-ui
           immutable-tag-prefix: sha-
           expected-image-digest: ${{ steps.ui-evidence.outputs.expected-image-digest }}
@@ -356,6 +364,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deployment-production-evidence
+          overwrite: true
           path: artifacts/deploy/**
           if-no-files-found: warn
           retention-days: 90

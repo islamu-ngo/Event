@@ -6,6 +6,7 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class GitTagSignatureVerifierTests
 {
     private const string FirstReleaseTag = "v0.1.0";
+    private const string FirstReleaseCommitMessage = "feat(events): publish first release";
 
     [Test]
     public async Task RepositoryDefaultAllowedSignersFailsClosedUntilProductionSignerIsEnrolled()
@@ -16,7 +17,7 @@ public sealed class GitTagSignatureVerifierTests
         }
 
         using var fixture = new SignedTagFixture();
-        string commit = fixture.Commit("feat(events): publish first release");
+        string commit = fixture.Commit(FirstReleaseCommitMessage);
         fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
         string repoAllowedSigners = Path.Combine(RepositoryRoot.Find(), "eng", "release", "trust", "allowed-signers");
 
@@ -39,7 +40,7 @@ public sealed class GitTagSignatureVerifierTests
         }
 
         using var fixture = new SignedTagFixture();
-        string firstCommit = fixture.Commit("feat(events): publish first release");
+        string firstCommit = fixture.Commit(FirstReleaseCommitMessage);
         string secondCommit = fixture.Commit("fix(events): correct schedule alignment");
         fixture.CreateSignedTag(FirstReleaseTag, secondCommit, fixture.AuthorizedKeyPath);
 
@@ -168,7 +169,7 @@ public sealed class GitTagSignatureVerifierTests
     [Arguments("v01.0.0")]
     [Arguments("refs/tags/v0.1.0")]
     [Arguments("v0.1.0;id")]
-    public async Task RejectsMalformedTagNamesAndInvalidExpectedOids(string malformedTag)
+    public async Task RejectsMalformedTagNames(string malformedTag)
     {
         if (OperatingSystem.IsWindows())
         {
@@ -176,7 +177,7 @@ public sealed class GitTagSignatureVerifierTests
         }
 
         using var fixture = new SignedTagFixture();
-        string commit = fixture.Commit("feat(events): publish first release");
+        string commit = fixture.Commit(FirstReleaseCommitMessage);
         fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
 
         GitTagVerificationResult badTag = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
@@ -185,6 +186,19 @@ public sealed class GitTagSignatureVerifierTests
             fixture.AllowedSignersPath));
         await Assert.That(badTag.IsValid).IsFalse();
         await Assert.That(badTag.Diagnostic).IsEqualTo("tag_name_malformed");
+    }
+
+    [Test]
+    public async Task RejectsAbbreviatedExpectedTargetOid()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new SignedTagFixture();
+        string commit = fixture.Commit(FirstReleaseCommitMessage);
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
 
         GitTagVerificationResult badTarget = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
@@ -193,14 +207,41 @@ public sealed class GitTagSignatureVerifierTests
             ExpectedTargetOid: commit[..12]));
         await Assert.That(badTarget.IsValid).IsFalse();
         await Assert.That(badTarget.Diagnostic).IsEqualTo("tag_expected_target_invalid");
+    }
 
+    [Test]
+    public async Task RejectsUppercaseExpectedEventSha()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new SignedTagFixture();
+        string commit = fixture.Commit(FirstReleaseCommitMessage);
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
+
+        string uppercaseHexOid = "A" + new string('0', 39);
         GitTagVerificationResult badEventSha = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
             FirstReleaseTag,
             fixture.AllowedSignersPath,
-            ExpectedEventSha: commit.ToUpperInvariant()));
+            ExpectedEventSha: uppercaseHexOid));
         await Assert.That(badEventSha.IsValid).IsFalse();
         await Assert.That(badEventSha.Diagnostic).IsEqualTo("tag_expected_event_sha_invalid");
+    }
+
+    [Test]
+    public async Task RejectsMissingTag()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new SignedTagFixture();
+        string commit = fixture.Commit(FirstReleaseCommitMessage);
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
 
         GitTagVerificationResult missingTag = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
             fixture.RepositoryRoot,
@@ -219,7 +260,7 @@ public sealed class GitTagSignatureVerifierTests
         }
 
         using var fixture = new SignedTagFixture();
-        string commit = fixture.Commit("feat(events): publish first release");
+        string commit = fixture.Commit(FirstReleaseCommitMessage);
         fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
 
         string linkedSigners = Path.Combine(fixture.Root, "linked-signers");

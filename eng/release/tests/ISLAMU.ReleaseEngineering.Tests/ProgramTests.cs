@@ -7,6 +7,8 @@ namespace ISLAMU.ReleaseEngineering.Tests;
 public sealed class ProgramTests
 {
     private const string ExpectedGitCliffVersionBanner = "git-cliff 2.14.2";
+    private const string SealArtifactsCommand = "seal-artifacts";
+    private const string TagOption = "--tag";
 
     [Test]
     public async Task VerifyToolsRejectsMissingLock()
@@ -217,7 +219,7 @@ public sealed class ProgramTests
         await Assert.That(text).Contains("verify-release-tag");
         await Assert.That(text).Contains("diff-contracts");
         await Assert.That(text).Contains("--image-manifest");
-        await Assert.That(text).Contains("seal-artifacts");
+        await Assert.That(text).Contains(SealArtifactsCommand);
         await Assert.That(text).Contains("preflight-range");
         await Assert.That(text).DoesNotContain("run-promoted");
         await Assert.That(text).DoesNotContain("verify-candidate");
@@ -253,7 +255,7 @@ public sealed class ProgramTests
 
             using var okOutput = new StringWriter();
             int okCode = Program.Run(
-                ["verify-release-tag", "--repository", repoRoot, "--tag", "v0.1.0", "--target", commit, "--event-sha", commit, "--allowed-signers", allowedSigners],
+                ["verify-release-tag", "--repository", repoRoot, TagOption, "v0.1.0", "--target", commit, "--event-sha", commit, "--allowed-signers", allowedSigners],
                 okOutput);
             await Assert.That(okCode).IsEqualTo(Program.Success).Because(okOutput.ToString());
             await Assert.That(okOutput.ToString()).Contains("verified_release_tag: v0.1.0");
@@ -261,7 +263,7 @@ public sealed class ProgramTests
 
             using var badOutput = new StringWriter();
             int badCode = Program.Run(
-                ["verify-release-tag", "--repository", repoRoot, "--tag", "v0.1.0", "--event-sha", new string('a', 40), "--allowed-signers", allowedSigners],
+                ["verify-release-tag", "--repository", repoRoot, TagOption, "v0.1.0", "--event-sha", new string('a', 40), "--allowed-signers", allowedSigners],
                 badOutput);
             await Assert.That(badCode).IsEqualTo(Program.ToolchainRejected);
             await Assert.That(badOutput.ToString()).Contains("tag_event_sha_mismatch");
@@ -280,16 +282,16 @@ public sealed class ProgramTests
         string commitOid = new('a', 40);
 
         using var badArgsOut = new StringWriter();
-        int badArgsCode = Program.Run(["seal-artifacts", "--directory", fixture.ArtifactDirectory], badArgsOut);
+        int badArgsCode = Program.Run([SealArtifactsCommand, "--directory", fixture.ArtifactDirectory], badArgsOut);
         await Assert.That(badArgsCode).IsEqualTo(Program.UsageError);
 
         using var okOut = new StringWriter();
         int okCode = Program.Run(
             [
-                "seal-artifacts",
+                SealArtifactsCommand,
                 "--directory", fixture.ArtifactDirectory,
                 "--version", "1.1.0",
-                "--tag", "v1.1.0",
+                TagOption, "v1.1.0",
                 "--commit", commitOid,
                 "--output-dir", outputDir,
             ],
@@ -302,10 +304,10 @@ public sealed class ProgramTests
         using var clobberOut = new StringWriter();
         int clobberCode = Program.Run(
             [
-                "seal-artifacts",
+                SealArtifactsCommand,
                 "--directory", fixture.ArtifactDirectory,
                 "--version", "1.1.0",
-                "--tag", "v1.1.0",
+                TagOption, "v1.1.0",
                 "--commit", commitOid,
                 "--output-dir", outputDir,
             ],

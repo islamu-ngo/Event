@@ -36,23 +36,24 @@ on:
       registry:
         required: false
         type: string
-        default: "atcr.io"
+        default: ""
       registry-user:
-        required: true
+        required: false
         type: string
+        default: ""
     secrets:
-      ATCR_PASSWORD:
+      CONTAINER_REGISTRY_PASSWORD:
         required: false
     outputs:
       digest:
-        description: "Immutable OCI index digest (sha256:...) built and pushed to both registries."
+        description: "Immutable OCI index digest (sha256:...) built and pushed to every configured registry."
         value: ${{ jobs.build.outputs.digest }}
-      atcr-reference:
-        description: "Canonical ATCR registry/repository@sha256:... reference."
-        value: ${{ jobs.build.outputs.atcr-reference }}
       ghcr-reference:
         description: "Canonical GHCR registry/repository@sha256:... reference."
         value: ${{ jobs.build.outputs.ghcr-reference }}
+      secondary-reference:
+        description: "Optional canonical external OCI registry/repository@sha256:... reference (empty in GHCR-only mode)."
+        value: ${{ jobs.build.outputs.secondary-reference }}
 
 permissions:
   contents: read
@@ -70,11 +71,11 @@ jobs:
 
     outputs:
       digest: ${{ steps.refs.outputs.digest }}
-      atcr-reference: ${{ steps.refs.outputs.atcr-reference }}
       ghcr-reference: ${{ steps.refs.outputs.ghcr-reference }}
+      secondary-reference: ${{ steps.refs.outputs.secondary-reference }}
 
     steps:
-      - name: Validate container build inputs
+      - name: Validate container build inputs and resolve configured registries
         id: validate
         shell: bash
         env:
@@ -83,7 +84,7 @@ jobs:
           REGISTRY: ${{ inputs.registry }}
           REGISTRY_USER: ${{ inputs.registry-user }}
           IMAGE_NAME: ${{ inputs.image-name }}
-          ATCR_SECRET_PRESENT: ${{ secrets.ATCR_PASSWORD != '' }}
+          REGISTRY_SECRET_PRESENT: ${{ secrets.CONTAINER_REGISTRY_PASSWORD != '' }}
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
@@ -107,15 +108,62 @@ jobs:
               ;;
           esac
 
-          if [[ "${ATCR_SECRET_PRESENT}" != "true" ]]; then
-            echo "ATCR_PASSWORD secret is required for container builds." >&2
-            exit 1
+          ghcr_owner="${REPO_OWNER,,}"
+          ghcr_repo="ghcr.io/${ghcr_owner}/${IMAGE_NAME}"
+
+          trimmed_registry="${REGISTRY#"${REGISTRY%%[![:space:]]*}"}"
+          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
+          effective_registry="${trimmed_registry,,}"
+
+          trimmed_user="${REGISTRY_USER#"${REGISTRY_USER%%[![:space:]]*}"}"
+          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
+          effective_user="${trimmed_user,,}"
+
+          if [[ -z "${effective_registry}" || "${effective_registry}" == "ghcr.io" ]]; then
+            use_secondary="false"
+            primary_registry="ghcr.io"
+            primary_user="${effective_user:-${ghcr_owner}}"
+            secondary_repo=""
+            metadata_images="${ghcr_repo}"
+            buildx_outputs="type=image,name=${ghcr_repo},push=true,push-by-digest=true,name-canonical=true"
+          else
+            if [[ ! "${effective_registry}" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[0-9]{1,5})?$ ]]; then
+              echo "Invalid container registry hostname '${effective_registry}'." >&2
+              exit 1
+            fi
+
+            if [[ -z "${effective_user}" || ! "${effective_user}" =~ ^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*$ ]]; then
+              echo "CONTAINER_REGISTRY_USER is required and must be a valid OCI namespace when targeting '${effective_registry}'." >&2
+              exit 1
+            fi
+
+            if [[ "${REGISTRY_SECRET_PRESENT}" != "true" ]]; then
+              echo "CONTAINER_REGISTRY_PASSWORD secret is required when targeting external registry '${effective_registry}'." >&2
+              exit 1
+            fi
+
+            use_secondary="true"
+            primary_registry="${effective_registry}"
+            primary_user="${effective_user}"
+            secondary_repo="${effective_registry}/${effective_user}/${IMAGE_NAME}"
+            metadata_images="$(printf '%s\n%s' "${secondary_repo}" "${ghcr_repo}")"
+            buildx_outputs="$(printf 'type=image,name=%s,push=true,push-by-digest=true,name-canonical=true\ntype=image,name=%s,push=true,push-by-digest=true,name-canonical=true' "${secondary_repo}" "${ghcr_repo}")"
           fi
 
-          ghcr_owner="${REPO_OWNER,,}"
-          echo "ghcr-owner=${ghcr_owner}" >> "$GITHUB_OUTPUT"
-          echo "atcr-repository=${REGISTRY}/${REGISTRY_USER}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
-          echo "ghcr-repository=ghcr.io/${ghcr_owner}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          {
+            echo "use-secondary=${use_secondary}"
+            echo "primary-registry=${primary_registry}"
+            echo "primary-user=${primary_user}"
+            echo "ghcr-owner=${ghcr_owner}"
+            echo "ghcr-repository=${ghcr_repo}"
+            echo "secondary-repository=${secondary_repo}"
+            echo "metadata-images<<__ISLAMU_EOF__"
+            printf '%s\n' "${metadata_images}"
+            echo "__ISLAMU_EOF__"
+            echo "buildx-outputs<<__ISLAMU_EOF__"
+            printf '%s\n' "${buildx_outputs}"
+            echo "__ISLAMU_EOF__"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -133,12 +181,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Log in to ATcr
+      - name: Log in to external container registry
+        if: ${{ steps.validate.outputs.use-secondary == 'true' }}
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
-          registry: ${{ inputs.registry }}
-          username: ${{ inputs.registry-user }}
-          password: ${{ secrets.ATCR_PASSWORD }}
+          registry: ${{ steps.validate.outputs.primary-registry }}
+          username: ${{ steps.validate.outputs.primary-user }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
       - name: Log in to GHCR
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -152,9 +201,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: |
-            ${{ steps.validate.outputs.atcr-repository }}
-            ${{ steps.validate.outputs.ghcr-repository }}
+          images: ${{ steps.validate.outputs.metadata-images }}
           tags: ${{ inputs.metadata-tags }}
 
       - name: Build and push (tagged mode)
@@ -189,9 +236,7 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ github.ref_name }}
-          outputs: |
-            type=image,name=${{ steps.validate.outputs.atcr-repository }},push=true,push-by-digest=true,name-canonical=true
-            type=image,name=${{ steps.validate.outputs.ghcr-repository }},push=true,push-by-digest=true,name-canonical=true
+          outputs: ${{ steps.validate.outputs.buildx-outputs }}
           build-args: |
             BUILD_CONFIGURATION=${{ inputs.build-configuration }}
 
@@ -201,7 +246,8 @@ jobs:
         env:
           TAGGED_DIGEST: ${{ steps.build-tagged.outputs.digest }}
           DIGEST_ONLY_DIGEST: ${{ steps.build-digest.outputs.digest }}
-          ATCR_REPOSITORY: ${{ steps.validate.outputs.atcr-repository }}
+          USE_SECONDARY: ${{ steps.validate.outputs.use-secondary }}
+          SECONDARY_REPOSITORY: ${{ steps.validate.outputs.secondary-repository }}
           GHCR_REPOSITORY: ${{ steps.validate.outputs.ghcr-repository }}
         run: |
           set -euo pipefail
@@ -211,12 +257,16 @@ jobs:
             exit 1
           fi
 
-          atcr_ref="${ATCR_REPOSITORY}@${digest}"
           ghcr_ref="${GHCR_REPOSITORY}@${digest}"
+          secondary_ref=""
+          if [[ "${USE_SECONDARY}" == "true" ]]; then
+            secondary_ref="${SECONDARY_REPOSITORY}@${digest}"
+          fi
+
           {
             echo "digest=${digest}"
-            echo "atcr-reference=${atcr_ref}"
             echo "ghcr-reference=${ghcr_ref}"
+            echo "secondary-reference=${secondary_ref}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Record image digest evidence (tagged mode)
@@ -256,11 +306,19 @@ jobs:
           DOCKERFILE: ${{ inputs.dockerfile }}
           CONTEXT: ${{ inputs.context }}
           DIGEST: ${{ steps.refs.outputs.digest }}
-          ATCR_REF: ${{ steps.refs.outputs.atcr-reference }}
+          USE_SECONDARY: ${{ steps.validate.outputs.use-secondary }}
+          SECONDARY_REF: ${{ steps.refs.outputs.secondary-reference }}
           GHCR_REF: ${{ steps.refs.outputs.ghcr-reference }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/container
+
+          if [[ "${USE_SECONDARY}" == "true" ]]; then
+            references_json="$(jq -n --arg secondary "${SECONDARY_REF}" --arg ghcr "${GHCR_REF}" '[$secondary, $ghcr] | sort')"
+            docker buildx imagetools inspect "${SECONDARY_REF}" > "artifacts/container/${IMAGE_NAME}-secondary-oci-inspect.txt"
+          else
+            references_json="$(jq -n --arg ghcr "${GHCR_REF}" '[$ghcr]')"
+          fi
 
           jq -n \
             --arg imageName "${IMAGE_NAME}" \
@@ -268,8 +326,7 @@ jobs:
             --arg context "${CONTEXT}" \
             --arg pushMode "digest-only" \
             --arg digest "${DIGEST}" \
-            --arg atcrReference "${ATCR_REF}" \
-            --arg ghcrReference "${GHCR_REF}" \
+            --argjson references "${references_json}" \
             --arg repository "${GITHUB_REPOSITORY}" \
             --arg sha "${GITHUB_SHA}" \
             --arg ref "${GITHUB_REF}" \
@@ -282,8 +339,7 @@ jobs:
               pushMode: $pushMode,
               digest: $digest,
               tags: [],
-              atcrReference: $atcrReference,
-              ghcrReference: $ghcrReference,
+              references: $references,
               github: {
                 repository: $repository,
                 sha: $sha,
@@ -293,8 +349,6 @@ jobs:
               }
             }' > "artifacts/container/${IMAGE_NAME}-digest.json"
 
-          docker buildx imagetools inspect "${ATCR_REF}" > "artifacts/container/${IMAGE_NAME}-atcr-oci-inspect.txt"
-
           {
             echo "## Container image digest-only staging"
             echo
@@ -303,8 +357,7 @@ jobs:
             echo "Digest: \`${DIGEST}\`"
             echo
             echo "Canonical tagless references:"
-            echo "- \`${ATCR_REF}\`"
-            echo "- \`${GHCR_REF}\`"
+            jq -r '.references[] | "- `" + . + "`"' "artifacts/container/${IMAGE_NAME}-digest.json"
             echo
             echo "No mutable or version registry tags were assigned."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -340,8 +393,8 @@ jobs:
         env:
           RestorePackagesWithLockFile: "false"
           IMAGE_NAME: ${{ inputs.image-name }}
-          REGISTRY: ${{ inputs.registry }}
-          REGISTRY_USER: ${{ inputs.registry-user }}
+          REGISTRY: ${{ steps.validate.outputs.primary-registry }}
+          REGISTRY_USER: ${{ steps.validate.outputs.primary-user }}
           DIGEST: ${{ steps.refs.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |

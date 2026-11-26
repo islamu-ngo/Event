@@ -82,6 +82,30 @@ public sealed class ReleaseArtifactManifestTests
     }
 
     [Test]
+    public async Task SealsSingleRegistryGhcrOnlyManifestDeterministically()
+    {
+        using var fixture = new ArtifactSealFixture();
+        await File.WriteAllTextAsync(
+            Path.Combine(fixture.ArtifactDirectory, "release-images.v1.json"),
+            ReleaseImageManifestTests.ValidSingleRegistryManifestJson("ghcr.io", "islamu-ngo", SampleVersion, SampleCommitOid) + "\n");
+
+        ReleaseArtifactSealResult result = ReleaseArtifactManifest.Seal(new ReleaseArtifactSealRequest(
+            fixture.ArtifactDirectory,
+            SampleVersion,
+            SampleTag,
+            SampleCommitOid));
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "valid ghcr-only seal");
+        await Assert.That(result.Manifest!.Images).Count().IsEqualTo(4);
+        await Assert.That(result.Manifest.Images.Sum(i => i.CanonicalReferences.Count)).IsEqualTo(4);
+        foreach (EnrichedImageReference image in result.Manifest.Images)
+        {
+            await Assert.That(image.CanonicalReferences).Count().IsEqualTo(1);
+            await Assert.That(image.CanonicalReferences[0]).StartsWith("ghcr.io/");
+        }
+    }
+
+    [Test]
     public async Task RepeatedSealIntoFreshOutputDirectoriesProducesByteIdenticalManifestAndChecksums()
     {
         using var fixture = new ArtifactSealFixture();

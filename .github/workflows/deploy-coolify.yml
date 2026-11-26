@@ -77,10 +77,6 @@ on:
       - "!.github/workflows/_container-build.yml"
       - "!.github/workflows/deploy-coolify.yml"
 
-env:
-  REGISTRY: atcr.io
-  REGISTRY_USER: amirakrari.bsky.social
-
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -103,7 +99,37 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       both_changed: ${{ steps.check-both.outputs.both_changed }}
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      registry: ${{ steps.resolve-registry.outputs.registry }}
+      registry-user: ${{ steps.resolve-registry.outputs.registry-user }}
     steps:
+      - name: Resolve container registry configuration
+        id: resolve-registry
+        shell: bash
+        env:
+          CONFIGURED_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          CONFIGURED_REGISTRY_USER: ${{ vars.CONTAINER_REGISTRY_USER }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          trimmed_registry="${CONFIGURED_REGISTRY#"${CONFIGURED_REGISTRY%%[![:space:]]*}"}"
+          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
+          registry="${trimmed_registry,,}"
+          trimmed_user="${CONFIGURED_REGISTRY_USER#"${CONFIGURED_REGISTRY_USER%%[![:space:]]*}"}"
+          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
+          registry_user="${trimmed_user,,}"
+
+          if [[ -z "${registry}" || "${registry}" == "ghcr.io" ]]; then
+            registry="ghcr.io"
+            registry_user="${registry_user:-${REPO_OWNER,,}}"
+          elif [[ -z "${registry_user}" ]]; then
+            echo "vars.CONTAINER_REGISTRY_USER is required when vars.CONTAINER_REGISTRY='${registry}'." >&2
+            exit 1
+          fi
+
+          {
+            echo "registry=${registry}"
+            echo "registry-user=${registry_user}"
+          } >> "$GITHUB_OUTPUT"
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -204,8 +230,8 @@ jobs:
       image-name: ${{ matrix.image-name }}
       dockerfile: ${{ matrix.dockerfile }}
       context: ${{ matrix.context }}
-      registry: atcr.io
-      registry-user: amirakrari.bsky.social
+      registry: ${{ needs.detect-changes.outputs.registry }}
+      registry-user: ${{ needs.detect-changes.outputs.registry-user }}
       build-configuration: Release
       metadata-tags: |
         type=raw,value=latest
@@ -213,7 +239,7 @@ jobs:
         type=semver,pattern={{version}}
         type=semver,pattern={{major}}.{{minor}}
     secrets:
-      ATCR_PASSWORD: ${{ secrets.ATCR_PASSWORD }}
+      CONTAINER_REGISTRY_PASSWORD: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
   # JOB 4: Deploy to Production
   deploy:
@@ -282,8 +308,8 @@ jobs:
           coolify-webhook: ${{ secrets.COOLIFY_DEPLOY_API_WEBHOOK }}
           coolify-token: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
           smoke-base-url: ${{ vars.PRODUCTION_API_URL }}
-          registry: atcr.io
-          registry-user: amirakrari.bsky.social
+          registry: ${{ needs.detect-changes.outputs.registry }}
+          registry-user: ${{ needs.detect-changes.outputs.registry-user }}
           image-name: islamu-event-api
           immutable-tag-prefix: sha-
           expected-image-digest: ${{ steps.api-evidence.outputs.expected-image-digest }}
@@ -315,8 +341,8 @@ jobs:
           coolify-webhook: ${{ secrets.COOLIFY_DEPLOY_UI_WEBHOOK }}
           coolify-token: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
           smoke-base-url: ${{ vars.PRODUCTION_UI_URL }}
-          registry: atcr.io
-          registry-user: amirakrari.bsky.social
+          registry: ${{ needs.detect-changes.outputs.registry }}
+          registry-user: ${{ needs.detect-changes.outputs.registry-user }}
           image-name: islamu-event-ui
           immutable-tag-prefix: sha-
           expected-image-digest: ${{ steps.ui-evidence.outputs.expected-image-digest }}

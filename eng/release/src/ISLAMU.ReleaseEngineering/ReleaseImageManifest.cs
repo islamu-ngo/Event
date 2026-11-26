@@ -17,8 +17,9 @@ public sealed record ReleaseImageManifestLoadResult(
 
 /// <summary>
 /// Strictly parses and validates <c>release-images.v1.json</c> produced after multi-arch OCI
-/// digest-only builds across both ATCR and GHCR (exact 4 approved images, 8 tagless canonical
-/// <c>registry/repository@sha256:&lt;digest&gt;</c> references).
+/// digest-only builds across one or more configured OCI registries (exact 4 approved images,
+/// tagless canonical <c>registry/repository@sha256:&lt;digest&gt;</c> references with identical
+/// registry coverage across every image).
 /// </summary>
 public static class ReleaseImageManifest
 {
@@ -32,6 +33,7 @@ public static class ReleaseImageManifest
     }
 
     private const int MaximumManifestBytes = 256 * 1024;
+    private const int MaximumRegistriesPerImage = 16;
     private const int ExpectedSchemaVersion = 1;
     private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
     private static readonly HashSet<string> RequiredImageNames = new(StringComparer.Ordinal)
@@ -42,26 +44,21 @@ public static class ReleaseImageManifest
         "migration",
     };
 
-    private static readonly HashSet<string> RequiredRegistries = new(StringComparer.Ordinal)
-    {
-        "atcr.io",
-        "ghcr.io",
-    };
-
     private static readonly Regex DigestPattern = new(
         "^sha256:[0-9a-f]{64}$",
         RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 
     private static readonly Regex CanonicalReferencePattern = new(
-        "^(?<registry>atcr\\.io|ghcr\\.io)/(?<repository>[a-z0-9][a-z0-9._/-]*[a-z0-9])@(?<digest>sha256:[0-9a-f]{64})$",
+        "^(?<registry>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::[0-9]{1,5})?)/(?<repository>[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*)@(?<digest>sha256:[0-9a-f]{64})$",
         RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture,
         TimeSpan.FromMilliseconds(100));
 
     public static ReleaseImageManifestLoadResult LoadFromFile(
         string manifestPath,
         string expectedVersion,
-        string? expectedCommitOid = null)
+        string? expectedCommitOid = null,
+        IReadOnlyCollection<string>? requiredRegistries = null)
     {
         if (!TryResolveExistingManifestPath(manifestPath, out string fullPath))
         {
@@ -77,7 +74,7 @@ public static class ReleaseImageManifest
             }
 
             string json = StrictUtf8.GetString(File.ReadAllBytes(fullPath));
-            return Parse(json, expectedVersion, expectedCommitOid);
+            return Parse(json, expectedVersion, expectedCommitOid, requiredRegistries);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DecoderFallbackException)
         {
@@ -88,7 +85,8 @@ public static class ReleaseImageManifest
     public static ReleaseImageManifestLoadResult Parse(
         string json,
         string expectedVersion,
-        string? expectedCommitOid = null)
+        string? expectedCommitOid = null,
+        IReadOnlyCollection<string>? requiredRegistries = null)
     {
         if (string.IsNullOrWhiteSpace(json) || StrictUtf8.GetByteCount(json) > MaximumManifestBytes)
         {
@@ -109,7 +107,7 @@ public static class ReleaseImageManifest
                 return Invalid(headerDiagnostic);
             }
 
-            string? imagesDiagnostic = TryParseImages(imagesEl, out EnrichedImageReference[] ordered);
+            string? imagesDiagnostic = TryParseImages(imagesEl, requiredRegistries, out EnrichedImageReference[] ordered);
             return imagesDiagnostic is not null
                 ? Invalid(imagesDiagnostic)
                 : new ReleaseImageManifestLoadResult(
@@ -212,18 +210,31 @@ public static class ReleaseImageManifest
         return null;
     }
 
-    private static string? TryParseImages(JsonElement imagesEl, out EnrichedImageReference[] ordered)
+    private static string? TryParseImages(
+        JsonElement imagesEl,
+        IReadOnlyCollection<string>? requiredRegistries,
+        out EnrichedImageReference[] ordered)
     {
         ordered = [];
         var seenImages = new HashSet<string>(StringComparer.Ordinal);
         var parsedImages = new List<EnrichedImageReference>(RequiredImageNames.Count);
+        HashSet<string>? expectedRegistrySet = null;
 
         foreach (JsonElement imageEl in imagesEl.EnumerateArray())
         {
-            string? entryError = TryParseSingleImage(imageEl, seenImages, out EnrichedImageReference? parsed);
+            string? entryError = TryParseSingleImage(imageEl, seenImages, out EnrichedImageReference? parsed, out HashSet<string> imageRegistries);
             if (entryError is not null)
             {
                 return entryError;
+            }
+
+            if (expectedRegistrySet is null)
+            {
+                expectedRegistrySet = imageRegistries;
+            }
+            else if (!expectedRegistrySet.SetEquals(imageRegistries))
+            {
+                return Diagnostics.ReferenceInvalid;
             }
 
             parsedImages.Add(parsed!);
@@ -234,6 +245,12 @@ public static class ReleaseImageManifest
             return Diagnostics.IncompleteImages;
         }
 
+        if (requiredRegistries is { Count: > 0 } &&
+            (expectedRegistrySet is null || !requiredRegistries.All(expectedRegistrySet.Contains)))
+        {
+            return Diagnostics.ReferenceInvalid;
+        }
+
         ordered = parsedImages.OrderBy(i => i.ImageName, StringComparer.Ordinal).ToArray();
         return null;
     }
@@ -241,9 +258,11 @@ public static class ReleaseImageManifest
     private static string? TryParseSingleImage(
         JsonElement imageEl,
         HashSet<string> seenImages,
-        out EnrichedImageReference? parsed)
+        out EnrichedImageReference? parsed,
+        out HashSet<string> registries)
     {
         parsed = null;
+        registries = new HashSet<string>(StringComparer.Ordinal);
         if (imageEl.ValueKind != JsonValueKind.Object ||
             !JsonElementCanonicalizer.TryGetNonEmptyString(imageEl, "name", out string? name) ||
             !JsonElementCanonicalizer.TryGetNonEmptyString(imageEl, "digest", out string? digest) ||
@@ -259,7 +278,7 @@ public static class ReleaseImageManifest
         }
 
         if (!DigestPattern.IsMatch(digest) ||
-            !TryParseCanonicalReferences(refsEl, digest, out string[] canonicalRefs))
+            !TryParseCanonicalReferences(refsEl, digest, out string[] canonicalRefs, out registries))
         {
             return Diagnostics.ReferenceInvalid;
         }
@@ -268,15 +287,19 @@ public static class ReleaseImageManifest
         return null;
     }
 
-    private static bool TryParseCanonicalReferences(JsonElement refsEl, string expectedDigest, out string[] canonicalRefs)
+    private static bool TryParseCanonicalReferences(
+        JsonElement refsEl,
+        string expectedDigest,
+        out string[] canonicalRefs,
+        out HashSet<string> registriesSeen)
     {
         canonicalRefs = [];
-        var registriesSeen = new HashSet<string>(StringComparer.Ordinal);
-        var collected = new List<string>(RequiredRegistries.Count);
+        registriesSeen = new HashSet<string>(StringComparer.Ordinal);
+        var collected = new List<string>();
 
         foreach (JsonElement refEl in refsEl.EnumerateArray())
         {
-            if (refEl.ValueKind != JsonValueKind.String)
+            if (refEl.ValueKind != JsonValueKind.String || collected.Count >= MaximumRegistriesPerImage)
             {
                 return false;
             }
@@ -293,7 +316,7 @@ public static class ReleaseImageManifest
             collected.Add(reference);
         }
 
-        if (collected.Count != RequiredRegistries.Count || !registriesSeen.SetEquals(RequiredRegistries))
+        if (collected.Count == 0)
         {
             return false;
         }

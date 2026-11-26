@@ -14,13 +14,9 @@ concurrency:
   group: release-publication-${{ github.ref_name }}
   cancel-in-progress: false
 
-env:
-  ATCR_REGISTRY: atcr.io
-  ATCR_REGISTRY_USER: amirakrari.bsky.social
-
 jobs:
   preflight:
-    name: Verify Signed Tag And Sealed Release State
+    name: Verify Signed Tag, Registry Config, And Sealed Release State
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
@@ -33,6 +29,9 @@ jobs:
       tag-object-id: ${{ steps.verify-tag.outputs.tag-object-id }}
       signer-principal: ${{ steps.verify-tag.outputs.signer-principal }}
       release-dir: ${{ steps.verify-tag.outputs.release-dir }}
+      secondary-registry: ${{ steps.resolve-registries.outputs.secondary-registry }}
+      secondary-registry-user: ${{ steps.resolve-registries.outputs.secondary-registry-user }}
+      expected-reference-count: ${{ steps.resolve-registries.outputs.expected-reference-count }}
       should-publish: ${{ steps.publication-guard.outputs.should-publish }}
       publication-state: ${{ steps.publication-guard.outputs.publication-state }}
 
@@ -124,6 +123,68 @@ jobs:
             echo "- Authorized signer: \`${signer_principal}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Resolve configured OCI container registries from GitHub Variables and Secrets
+        id: resolve-registries
+        shell: bash
+        env:
+          CONFIGURED_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          CONFIGURED_REGISTRY_USER: ${{ vars.CONTAINER_REGISTRY_USER }}
+          REGISTRY_SECRET_PRESENT: ${{ secrets.CONTAINER_REGISTRY_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+
+          trimmed_registry="${CONFIGURED_REGISTRY#"${CONFIGURED_REGISTRY%%[![:space:]]*}"}"
+          trimmed_registry="${trimmed_registry%"${trimmed_registry##*[![:space:]]}"}"
+          effective_registry="${trimmed_registry,,}"
+
+          trimmed_user="${CONFIGURED_REGISTRY_USER#"${CONFIGURED_REGISTRY_USER%%[![:space:]]*}"}"
+          trimmed_user="${trimmed_user%"${trimmed_user##*[![:space:]]}"}"
+          effective_user="${trimmed_user,,}"
+
+          if [[ -z "${effective_registry}" || "${effective_registry}" == "ghcr.io" ]]; then
+            {
+              echo "secondary-registry="
+              echo "secondary-registry-user="
+              echo "expected-reference-count=4"
+            } >> "$GITHUB_OUTPUT"
+
+            {
+              echo "## Target Container Registries"
+              echo
+              echo "- Primary (built-in): \`ghcr.io\` (4 canonical digest references)"
+              echo "- Secondary mirror: not configured (set \`vars.CONTAINER_REGISTRY\`, \`vars.CONTAINER_REGISTRY_USER\`, and \`secrets.CONTAINER_REGISTRY_PASSWORD\` to enable an additional OCI registry)"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [[ ! "${effective_registry}" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[0-9]{1,5})?$ ]]; then
+            echo "Invalid vars.CONTAINER_REGISTRY hostname '${effective_registry}'." >&2
+            exit 1
+          fi
+
+          if [[ -z "${effective_user}" || ! "${effective_user}" =~ ^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*$ ]]; then
+            echo "vars.CONTAINER_REGISTRY_USER must be configured with a valid OCI namespace when vars.CONTAINER_REGISTRY='${effective_registry}'." >&2
+            exit 1
+          fi
+
+          if [[ "${REGISTRY_SECRET_PRESENT}" != "true" ]]; then
+            echo "secrets.CONTAINER_REGISTRY_PASSWORD must be configured in the release environment when vars.CONTAINER_REGISTRY='${effective_registry}'." >&2
+            exit 1
+          fi
+
+          {
+            echo "secondary-registry=${effective_registry}"
+            echo "secondary-registry-user=${effective_user}"
+            echo "expected-reference-count=8"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Target Container Registries"
+            echo
+            echo "- Primary (built-in): \`ghcr.io\`"
+            echo "- Secondary mirror: \`${effective_registry}/${effective_user}\` (8 canonical digest references total)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Guard against clobbering an existing published release before build
         id: publication-guard
         shell: bash
@@ -202,7 +263,7 @@ jobs:
           image_count="$(jq '.images | length' "${verify_dir}/release-artifact-manifest.v1.json")"
           ref_count="$(jq '[.images[].canonicalReferences[]] | length' "${verify_dir}/release-artifact-manifest.v1.json")"
 
-          if [[ "${manifest_version}" != "${VERSION}" || "${manifest_tag}" != "${TAG_NAME}" || "${manifest_commit}" != "${TARGET_COMMIT}" || "${image_count}" -ne 4 || "${ref_count}" -ne 8 ]]; then
+          if [[ "${manifest_version}" != "${VERSION}" || "${manifest_tag}" != "${TAG_NAME}" || "${manifest_commit}" != "${TARGET_COMMIT}" || "${image_count}" -ne 4 || "${ref_count}" -lt 4 || $((ref_count % 4)) -ne 0 ]]; then
             echo "Existing published release manifest identity mismatch (version=${manifest_version}, tag=${manifest_tag}, commit=${manifest_commit}, images=${image_count}, refs=${ref_count}); failing closed." >&2
             exit 1
           fi
@@ -253,10 +314,10 @@ jobs:
       environment: "release"
       build-configuration: "Release"
       platforms: "linux/amd64,linux/arm64"
-      registry: atcr.io
-      registry-user: amirakrari.bsky.social
+      registry: ${{ needs.preflight.outputs.secondary-registry }}
+      registry-user: ${{ needs.preflight.outputs.secondary-registry-user }}
     secrets:
-      ATCR_PASSWORD: ${{ secrets.ATCR_PASSWORD }}
+      CONTAINER_REGISTRY_PASSWORD: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
   prepare-and-seal:
     name: Assemble Image Manifest, Render Notes, And Seal Artifacts
@@ -306,11 +367,10 @@ jobs:
               exit 1
             fi
 
-            local push_mode digest atcr_ref ghcr_ref
+            local push_mode digest refs_json
             push_mode="$(jq -r '.pushMode' "${digest_file}")"
             digest="$(jq -r '.digest' "${digest_file}")"
-            atcr_ref="$(jq -r '.atcrReference' "${digest_file}")"
-            ghcr_ref="$(jq -r '.ghcrReference' "${digest_file}")"
+            refs_json="$(jq -c '.references | sort' "${digest_file}")"
 
             if [[ "${push_mode}" != "digest-only" ]]; then
               echo "Container build '${image_name}' was not staged in digest-only mode (pushMode=${push_mode})." >&2
@@ -325,12 +385,11 @@ jobs:
             jq -n \
               --arg name "${component}" \
               --arg digest "${digest}" \
-              --arg atcr "${atcr_ref}" \
-              --arg ghcr "${ghcr_ref}" \
+              --argjson refs "${refs_json}" \
               '{
                 name: $name,
                 digest: $digest,
-                references: ([$atcr, $ghcr] | sort)
+                references: $refs
               }'
           }
 
@@ -409,7 +468,7 @@ jobs:
           retention-days: 90
 
   sign-and-attest:
-    name: Attest Files And Cosign-Sign Eight OCI Refs And Checksums
+    name: Attest Files And Cosign-Sign Every OCI Ref And Checksums
     needs: [preflight, prepare-and-seal]
     if: ${{ needs.preflight.outputs.should-publish == 'true' }}
     runs-on: ubuntu-latest
@@ -454,12 +513,13 @@ jobs:
         with:
           cosign-release: "v3.1.5"
 
-      - name: Log in to ATCR for OCI signature attachment
+      - name: Log in to external container registry for OCI signature attachment
+        if: ${{ needs.preflight.outputs.secondary-registry != '' }}
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
-          registry: ${{ env.ATCR_REGISTRY }}
-          username: ${{ env.ATCR_REGISTRY_USER }}
-          password: ${{ secrets.ATCR_PASSWORD }}
+          registry: ${{ needs.preflight.outputs.secondary-registry }}
+          username: ${{ needs.preflight.outputs.secondary-registry-user }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
       - name: Log in to GHCR for OCI signature attachment
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -480,21 +540,22 @@ jobs:
             artifacts/release-sealed/release-rendering-context.v1.json
             artifacts/release-sealed/SHA256SUMS
 
-      - name: Cosign-sign and verify all eight ATCR and GHCR OCI digest references
+      - name: Cosign-sign and verify every canonical OCI digest reference
         shell: bash
         env:
           TAG_NAME: ${{ needs.preflight.outputs.tag-name }}
+          EXPECTED_REFERENCE_COUNT: ${{ needs.preflight.outputs.expected-reference-count }}
         run: |
           set -euo pipefail
           mapfile -t image_refs < <(jq -r '.images[].canonicalReferences[]' artifacts/release-sealed/release-artifact-manifest.v1.json)
-          if [[ "${#image_refs[@]}" -ne 8 ]]; then
-            echo "Expected exactly 8 canonical ATCR/GHCR OCI references to sign; found ${#image_refs[@]}." >&2
+          if [[ "${#image_refs[@]}" -ne "${EXPECTED_REFERENCE_COUNT}" ]]; then
+            echo "Expected exactly ${EXPECTED_REFERENCE_COUNT} canonical OCI references to sign; found ${#image_refs[@]}." >&2
             exit 1
           fi
 
           expected_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${TAG_NAME}"
           for ref in "${image_refs[@]}"; do
-            if [[ ! "${ref}" =~ ^(atcr\.io|ghcr\.io)/[a-z0-9][a-z0-9._/-]*[a-z0-9]@sha256:[0-9a-f]{64}$ ]]; then
+            if [[ ! "${ref}" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[0-9]{1,5})?/[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*@sha256:[0-9a-f]{64}$ ]]; then
               echo "Refusing to sign non-canonical OCI reference: '${ref}'." >&2
               exit 1
             fi
@@ -507,7 +568,7 @@ jobs:
           done
 
           {
-            echo "## Cosign OCI Signatures Verified (8 / 8)"
+            echo "## Cosign OCI Signatures Verified (${#image_refs[@]} / ${EXPECTED_REFERENCE_COUNT})"
             echo
             for ref in "${image_refs[@]}"; do
               echo "- \`${ref}\`"

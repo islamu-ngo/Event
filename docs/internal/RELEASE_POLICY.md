@@ -52,9 +52,9 @@ runtime lanes must not be presented as complete platform coverage. Its scope and
   (`gpg.format=ssh`, `gpg.ssh.allowedSignersFile`), authorized signer principal, and exact
   target commit / GitHub event SHA binding. Verification MUST NOT depend on any branch ref
   under `refs/heads/*`, so every release remains verifiable after branches advance or are deleted.
-- **Fail-closed signer root:** `eng/release/trust/allowed-signers` MUST remain comment-only
-  (causing fail-closed `tag_allowed_signers_empty` rejection) until the Project Steward
-  approves and enrolls production release signer public keys.
+- **Fail-closed signer root:** `eng/release/trust/allowed-signers` MUST contain only
+  Project Steward-approved public signing keys recorded in `eng/release/trust/rotation-history.md`
+  (and MUST fail closed with `tag_allowed_signers_empty` whenever no active entry exists).
 - **Version-line label:** every release MUST declare a version-line label `v<major>.<minor>`.
   The label classifies the release; it is not a ref and nothing may derive a branch name from it.
   `develop` MUST NOT receive generated `Unreleased` changelog writes.
@@ -237,7 +237,7 @@ guidance lives separately in
 tree under OpenSSH namespace `git`) and supports both pre-tag committed artifacts and post-tag
 sealed archives from `release.yml` (requiring an enrolled operator's OpenSSH detached signature
 `SHA256SUMS.sig` verified via `ssh-keygen -Y verify` under dedicated namespace
-`islamu-release-checksums` against `allowed-signers`, binding exact `SHA256SUMS`,
+`islamu.event.release-checksums` against `allowed-signers`, binding exact `SHA256SUMS`,
 `release-artifact-manifest.v1.json` with `sourceCommitOid == targetCommitOid`, and all five sealed
 artifacts without moving the tag), failing closed on unsigned re-seals, unauthorized signers,
 wrong namespaces, post-tag tampering, or accepted-page drift.

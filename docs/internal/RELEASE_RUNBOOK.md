@@ -113,15 +113,15 @@ All authoritative invocations (`prepare`, tests) verify executable SHA-256 and v
 
 ## Enrolling production SSH release signers (Project Steward gate)
 
-`eng/release/trust/allowed-signers` is intentionally comment-only until the Project Steward approves production signer enrollment, so `verify-release-tag` and `.github/workflows/release.yml` fail closed (`tag_allowed_signers_empty`).
+`verify-release-tag` and `.github/workflows/release.yml` fail closed (`tag_allowed_signers_empty`) whenever `eng/release/trust/allowed-signers` has no active public signer entries. Only Project Steward-approved operator public keys may be enrolled or rotated.
 
-When the Project Steward authorizes enrollment:
+To enroll or rotate an operator public key:
 
 1. Each authorized release operator generates a dedicated Ed25519 signing key on their own hardware/workstation and shares only the `.pub` file (private keys never enter Git, CI secrets, or chat):
    ```bash
-   ssh-keygen -t ed25519 -C "islamu-release-operator"
+   ssh-keygen -t ed25519 -a 100 -f ~/.ssh/islamu_release_ed25519 -C "islamu-release-operator"
    ```
-2. Add the reviewed principal line (`<principal> namespaces="git,islamu-release-checksums" ssh-ed25519 <base64-key>`) to `eng/release/trust/allowed-signers` (enabling domain-separated Git tag verification under `git` and post-tag `SHA256SUMS.sig` verification under `islamu-release-checksums`), record the rotation/enrollment in `eng/release/trust/rotation-history.md`, and merge through protected review.
+2. Add the reviewed principal line (`<principal> namespaces="git,islamu.event.release-checksums" ssh-ed25519 <base64-key>`) to `eng/release/trust/allowed-signers` (enabling domain-separated Git tag verification under `git` and post-tag `SHA256SUMS.sig` verification under `islamu.event.release-checksums`), record the rotation/enrollment in `eng/release/trust/rotation-history.md`, and merge through protected review.
 3. Configure the GitHub `release` environment (required reviewers, tag protection `v*` only), a GitHub **tag ruleset** restricting updates and deletions on `v*` (with reviewed minimal bypass actors), and optional container registry settings in GitHub Repository or Environment (`release` / `production` / `staging`) **Settings → Secrets and variables → Actions** (zero registry hosts or personal handles are hardcoded in workflow YAML):
 
    | Setting | Kind | Required | Purpose |
@@ -192,13 +192,13 @@ Because generated release artifacts are built and sealed **after** tagging (so t
 
 1. Set `SEALED_ROOT` to `docs/internal/releases` (recommended so the verified archive is committed for future offline CI `--check` runs, leaving committed `release.yaml` and `summary.md` untouched) — or to an external staging directory — and download the published eight release assets for `v<version>` into `"${SEALED_ROOT}/<version>/"`.
 2. Authenticate `"${SEALED_ROOT}/<version>/SHA256SUMS"` online with `cosign verify-blob` (`SHA256SUMS.sigstore.json`) and `gh attestation verify` against `.github/workflows/release.yml@refs/tags/v<version>` before trusting the downloaded files.
-3. Countersign the verified `SHA256SUMS` offline inside the selected artifact root with your enrolled release signing key under the dedicated `islamu-release-checksums` namespace (producing `"${SEALED_ROOT}/<version>/SHA256SUMS.sig"` so offline `sync-public-changelog --check` cryptographically rejects any unsigned or re-sealed working-tree edits):
+3. Countersign the verified `SHA256SUMS` offline inside the selected artifact root with your enrolled release signing key under the dedicated `islamu.event.release-checksums` namespace (producing `"${SEALED_ROOT}/<version>/SHA256SUMS.sig"` so offline `sync-public-changelog --check` cryptographically rejects any unsigned or re-sealed working-tree edits):
 
 ```bash
 SEALED_ROOT="docs/internal/releases" # or your chosen external staging root
 
 ssh-keygen -Y sign -f /path/to/release-signing-key \
-  -n islamu-release-checksums \
+  -n islamu.event.release-checksums \
   "${SEALED_ROOT}/<version>/SHA256SUMS"
 ```
 
@@ -214,7 +214,7 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
   --sealed-artifacts-root "${SEALED_ROOT}" --check
 ```
 
-`sync-public-changelog` cryptographically verifies both the SSH-signed annotated tag `v<version>` (`git` namespace, confirming `release.yaml`, `summary.md`, and every linked `CHG-*.yaml` byte-match the signed tag's target commit tree) AND the OpenSSH detached signature `SHA256SUMS.sig` (`islamu-release-checksums` namespace against `allowed-signers`, binding exact `SHA256SUMS`, `release-artifact-manifest.v1.json` with `sourceCommitOid == targetCommitOid`, `release-images.v1.json`, `release-context.v1.json`, `release-notes.md`, `contract-diff.v1.json`, and `release-rendering-context.v1.json`), writes the updated entries-only projection and `publication-manifest.v1.json` (preserving YAML frontmatter), and fails closed on any tamper, unauthorized key, wrong namespace, or re-sealed unsigned working-tree edit. Commit the signed sealed release archive (including `SHA256SUMS.sig`) plus `docs/public/changelog/README.md` and `docs/public/changelog/publication-manifest.v1.json` via PR so future CI `--check` runs and subsequent releases verify 100% offline.
+`sync-public-changelog` cryptographically verifies both the SSH-signed annotated tag `v<version>` (`git` namespace, confirming `release.yaml`, `summary.md`, and every linked `CHG-*.yaml` byte-match the signed tag's target commit tree) AND the OpenSSH detached signature `SHA256SUMS.sig` (`islamu.event.release-checksums` namespace against `allowed-signers`, binding exact `SHA256SUMS`, `release-artifact-manifest.v1.json` with `sourceCommitOid == targetCommitOid`, `release-images.v1.json`, `release-context.v1.json`, `release-notes.md`, `contract-diff.v1.json`, and `release-rendering-context.v1.json`), writes the updated entries-only projection and `publication-manifest.v1.json` (preserving YAML frontmatter), and fails closed on any tamper, unauthorized key, wrong namespace, or re-sealed unsigned working-tree edit. Commit the signed sealed release archive (including `SHA256SUMS.sig`) plus `docs/public/changelog/README.md` and `docs/public/changelog/publication-manifest.v1.json` via PR so future CI `--check` runs and subsequent releases verify 100% offline.
 
 ## Failure recovery and non-atomicity rules
 

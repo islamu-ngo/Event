@@ -289,7 +289,7 @@ public static class PublicChangelogPolicy
                 .Append(tagName)
                 .Append("` and authenticate `SHA256SUMS` via Cosign before verifying checksums (offline after this changelog PR merges: verify the repository-committed `docs/internal/releases/")
                 .Append(releaseVersion)
-                .Append("/SHA256SUMS.sig` under namespace `islamu-release-checksums`).\n");
+                .Append("/SHA256SUMS.sig` under namespace `islamu.event.release-checksums`).\n");
         }
 
         if (release.Images is { Count: > 0 })

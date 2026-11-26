@@ -1,5 +1,8 @@
-# ABOUTME: Intentionally empty production SSH allowed-signers root for release automation.
-# ABOUTME: Operators must promote real reviewed principals and keys before activation.
+# Production SSH allowed-signers trust root for ISLAMU Event releases.
+# Each enrolled operator public key is scoped to the domain-separated namespaces:
+#   - git                            (signed annotated release tags)
+#   - islamu.event.release-checksums (offline SHA256SUMS.sig countersignatures)
+# Private keys must NEVER be stored in this repository or in CI secrets.
+# All enrollments and revocations are recorded in eng/release/trust/rotation-history.md.
 
-# No production release or tooling-promotion signer is approved yet.
-# Keep this file comment-only so trusted-bundle activation fails closed.
+amirakrari@openislamu.org namespaces="git,islamu.event.release-checksums" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHffnnv/7xIi9LCK7oqxlgvoyMERPz7b+Pb+eukJwWzc islamu-release-operator

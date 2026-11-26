@@ -9,7 +9,31 @@ public sealed class GitTagSignatureVerifierTests
     private const string FirstReleaseCommitMessage = "feat(events): publish first release";
 
     [Test]
-    public async Task RepositoryDefaultAllowedSignersFailsClosedUntilProductionSignerIsEnrolled()
+    public async Task CommentOnlyAllowedSignersFailsClosedWithEmptyDiagnostic()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new SignedTagFixture();
+        string commit = fixture.Commit(FirstReleaseCommitMessage);
+        fixture.CreateSignedTag(FirstReleaseTag, commit, fixture.AuthorizedKeyPath);
+        string emptyAllowedSigners = Path.Combine(fixture.Root, "empty-allowed-signers");
+        await File.WriteAllTextAsync(emptyAllowedSigners, "# comment-only allowed-signers\n\n");
+
+        GitTagVerificationResult result = GitTagSignatureVerifier.Verify(new GitTagVerificationRequest(
+            fixture.RepositoryRoot,
+            FirstReleaseTag,
+            emptyAllowedSigners,
+            ExpectedTargetOid: commit));
+
+        await Assert.That(result.IsValid).IsFalse();
+        await Assert.That(result.Diagnostic).IsEqualTo("tag_allowed_signers_empty");
+    }
+
+    [Test]
+    public async Task RepositoryAllowedSignersRejectsUnauthorizedTestKey()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -28,7 +52,7 @@ public sealed class GitTagSignatureVerifierTests
             ExpectedTargetOid: commit));
 
         await Assert.That(result.IsValid).IsFalse();
-        await Assert.That(result.Diagnostic).IsEqualTo("tag_allowed_signers_empty");
+        await Assert.That(result.Diagnostic).IsEqualTo("tag_signature_invalid");
     }
 
     [Test]

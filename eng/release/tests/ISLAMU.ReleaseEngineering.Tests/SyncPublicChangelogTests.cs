@@ -310,7 +310,7 @@ public sealed class SyncPublicChangelogTests
         string checksumsPath = Path.Combine(versionSealedDir, ReleaseArtifactManifest.ChecksumsFileName);
         string sigPath = Path.Combine(versionSealedDir, ReleaseArtifactManifest.ChecksumsSignatureFileName);
 
-        // Wrong OpenSSH signature namespace ("git" instead of "islamu-release-checksums") must fail closed.
+        // Wrong OpenSSH signature namespace ("git" instead of "islamu.event.release-checksums") must fail closed.
         File.Delete(sigPath);
         fixture.SignChecksums(checksumsPath, authorizedKey: true, signatureNamespace: "git");
         (int wrongNsCode, string wrongNsOutput) = fixture.Run(sealedArtifactsRoot: externalSealedRoot);

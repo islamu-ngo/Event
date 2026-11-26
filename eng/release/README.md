@@ -29,7 +29,7 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
   verify-release-tag --tag v0.1.0 --target <full-commit-oid> [--event-sha <github-sha>] [--signer <principal>]
 ```
 
-`GitTagSignatureVerifier` enforces annotated tags (`cat-file -t == tag`), verifies the tag object's embedded `tag` header matches the ref name, binds target commit and optional event SHA, requires a non-empty allowed-signers file (failing closed while `eng/release/trust/allowed-signers` remains comment-only pending Project Steward enrollment), and invokes `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=... verify-tag`.
+`GitTagSignatureVerifier` enforces annotated tags (`cat-file -t == tag`), verifies the tag object's embedded `tag` header matches the ref name, binds target commit and optional event SHA, requires a non-empty allowed-signers file (failing closed with `tag_allowed_signers_empty` whenever no active signer is enrolled), and invokes `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=... verify-tag`.
 
 ## Release Preparation & Public Changelog Projection
 

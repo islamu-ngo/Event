@@ -175,7 +175,7 @@ public static class ReleaseArtifactManifest
     /// Verifies an existing sealed artifact directory against <c>release-artifact-manifest.v1.json</c>
     /// and <c>SHA256SUMS</c> without modifying any files. When <paramref name="allowedSignersPath"/> is
     /// provided, cryptographically authenticates the exact <c>SHA256SUMS</c> bytes via
-    /// <c>SHA256SUMS.sig</c> under the <c>islamu-release-checksums</c> OpenSSH namespace so unsigned or
+    /// <c>SHA256SUMS.sig</c> under the <c>islamu.event.release-checksums</c> OpenSSH namespace so unsigned or
     /// re-sealed working-tree edits cannot bypass verification.
     /// </summary>
     public static ReleaseArtifactVerificationResult VerifySealedDirectory(

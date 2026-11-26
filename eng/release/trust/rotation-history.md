@@ -2,32 +2,30 @@
 
 ## Current state
 
-No signer entry is currently bundled. Activation is blocked until independent
-reviewers approve real principals, unique public keys, custody owners, validity
-windows, revocation contacts, and the promoted artifact store. Private keys never
-belong in this repository or a trusted bundle.
-
-Activation itself is tooled and no longer hand-assembled: run `activate-trust` with the two
-reviewed **public** keys, as documented in
-[RELEASE_RUNBOOK.md](../../../docs/RELEASE_RUNBOOK.md). The command enforces separation of duty —
-distinct principals, distinct key material, distinct fingerprints — refuses private key files and
-non-`ssh-ed25519` algorithms, and refuses to overwrite an existing root without `--replace`. It is
-deliberately impossible for one person to satisfy, because one key that can both promote the tooling
-bundle and sign the release it attests would forge the whole chain on its own.
+Production release signing is governed by the public-key trust root in
+[`eng/release/trust/allowed-signers`](allowed-signers) as documented in
+[RELEASE_RUNBOOK.md](../../../docs/internal/RELEASE_RUNBOOK.md). Each enrolled
+operator public key (`ssh-ed25519` or hardware-backed `sk-ssh-ed25519@openssh.com`)
+is scoped to the domain-separated OpenSSH namespaces `git` (signed annotated
+release tags) and `islamu.event.release-checksums` (offline `SHA256SUMS.sig`
+countersignatures for post-tag sealed archives). Private keys never belong in
+this repository, in `.env` files, or in GitHub Actions secrets.
 
 ## Rotation and revocation contract
 
-- A new key receives a new unique principal and fingerprint. An overlap window is
-  allowed only for distinct keys and recorded validity periods.
-- Revocation is effective on and after its recorded policy date. Remove the key from
-  `allowed-signers`, append the reason and replacement here without restricted
-  details, promote a new trusted bundle, and retain the prior bundle as evidence.
-- A tag is an immutable Git object. Replacing or recreating a tag fails even when its
-  commit target and signer are unchanged; operators must investigate and issue a new
-  version rather than accepting the moved name.
+- A new key receives a distinct public key and recorded SHA-256 fingerprint.
+  An overlap window is allowed only for distinct keys and recorded validity
+  periods.
+- Revocation is effective on and after its recorded policy date. Remove the key
+  from `allowed-signers` (or bound it with `valid-before`), append the reason
+  and replacement below without restricted details, and merge through protected
+  review.
+- A tag is an immutable Git object. Replacing or recreating a published tag
+  fails verification even when its commit target and signer are unchanged;
+  operators must investigate and issue a new version rather than moving a tag.
 
 ## Entries
 
-| Principal | Role | Validity | Status | Disposition |
-|---|---|---|---|---|
-| _none_ | _none_ | _none_ | blocked | `allowed-signers` remains comment-only until reviewed production keys are promoted |
+| Principal | Role | Namespaces | Fingerprint (SHA-256) | Effective Date | Status | Disposition |
+|---|---|---|---|---|---|---|
+| `amirakrari@openislamu.org` | Project Steward / Release Operator | `git,islamu.event.release-checksums` | `SHA256:/+dDHXg2xUiZlIZgYV2gC6/UzxcrdCxC6b5egPbfJEw` (ED25519, `islamu-release-operator`) | 2026-11-27 | active | Initial production release operator public key enrolled in `eng/release/trust/allowed-signers` |

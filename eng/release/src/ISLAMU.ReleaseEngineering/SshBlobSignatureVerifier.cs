@@ -15,7 +15,7 @@ public sealed record SshBlobSignatureVerificationResult(
 /// </summary>
 public static class SshBlobSignatureVerifier
 {
-    public const string ReleaseChecksumsNamespace = "islamu-release-checksums";
+    public const string ReleaseChecksumsNamespace = "islamu.event.release-checksums";
 
     private const int MaximumOutputCharacters = 64 * 1024;
     private const long MaximumPayloadBytes = 16L * 1024 * 1024;

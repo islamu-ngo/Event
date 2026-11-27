@@ -267,6 +267,51 @@ public sealed class SetupLiveConfigurationImportTests(SetupLiveAuthorityRedFixtu
     }
 
     [Test]
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    [Arguments(true, true)]
+    public async Task TenantEnrollmentCannotStageInstanceManifest(
+        bool explicitEmptyTenants, bool disguisedAsTenantPackage)
+    {
+        await fixture.ResetAsync();
+        string originalName = await TenantName();
+        var enrollment = await Enroll(["target.read", "configuration.import"]);
+        await using var observer = fixture.Factory.CreateMigratorContext();
+        int tenantCount = await observer.Tenants.IgnoreQueryFilters().CountAsync();
+        int operationCount = await observer.ConfigurationManifestOperations.CountAsync();
+        fixture.BodyProbe.Reset();
+        using var upload = Request(enrollment, "");
+        // Only the media-type rejection must happen before reading; a disguised body is read to be rejected.
+        if (!disguisedAsTenantPackage)
+            upload.Headers.Add(UnreadBodyProbe.HeaderName, "1");
+        upload.Content = new StringContent($$"""
+            {
+              "$schema": "{{ConfigurationManifestContractMetadata.SchemaId}}",
+              "apiVersion": "{{ConfigurationManifestContractMetadata.ApiVersion}}",
+              "kind": "{{ConfigurationManifestContractMetadata.Kind}}",
+              "metadata": { "name": "instance-only-setup-boundary" },
+              "spec": {
+                "instance": { "settings": {}, "documents": {} }{{(explicitEmptyTenants ? ", \"tenants\": []" : "")}}
+              }
+            }
+            """);
+        upload.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(disguisedAsTenantPackage
+            ? TenantConfigurationPackageContractMetadata.MediaType
+            : ConfigurationManifestContractMetadata.MediaType);
+
+        using var response = await fixture.Client.SendAsync(upload);
+
+        await Assert.That(response.StatusCode).IsEqualTo(disguisedAsTenantPackage
+            ? HttpStatusCode.BadRequest : HttpStatusCode.UnsupportedMediaType);
+        if (!disguisedAsTenantPackage)
+            await Assert.That(fixture.BodyProbe.ReadCount).IsEqualTo(0);
+        await Assert.That(await TenantName()).IsEqualTo(originalName);
+        await Assert.That(await observer.Tenants.IgnoreQueryFilters().CountAsync()).IsEqualTo(tenantCount);
+        await Assert.That(await observer.ConfigurationManifestOperations.CountAsync()).IsEqualTo(operationCount);
+    }
+
+    [Test]
     public async Task InvalidCapabilityAndCrossTenantCannotStageConfiguration()
     {
         await fixture.ResetAsync();

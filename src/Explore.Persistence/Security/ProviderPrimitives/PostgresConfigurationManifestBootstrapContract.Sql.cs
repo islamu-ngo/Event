@@ -71,7 +71,7 @@ public static partial class PostgresConfigurationManifestBootstrapContract
             OR (SELECT count(*) FROM pg_catalog.jsonb_object_keys(p_scope)) <> 9
             OR EXISTS (SELECT 1 FROM unnest(ARRAY['Slugs','Tenants','CreatedTenants','Revisions','Documents','Policies','Operations']) key
                 WHERE pg_catalog.jsonb_typeof(p_scope->key) <> 'array')
-            OR pg_catalog.jsonb_array_length(p_scope->'Slugs') NOT BETWEEN 1 AND 256
+             OR pg_catalog.jsonb_array_length(p_scope->'Slugs') NOT BETWEEN 0 AND 256
             OR pg_catalog.jsonb_typeof(p_scope->'Operation') <> 'string'
             OR pg_catalog.jsonb_typeof(p_scope->'Effect') <> 'string' THEN
             RAISE EXCEPTION 'manifest_bootstrap_scope_invalid' USING ERRCODE = '22023';

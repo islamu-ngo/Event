@@ -4,13 +4,20 @@ description: Bootstrap and export governed configuration without secrets, PII, o
 
 # Configuration Manifests
 
-Configuration manifests move governed tenant settings and typed configuration documents across environments. They are specifically **not** database dumps, secret bundles, subject-data exports, or infrastructure snapshots.
+Configuration manifests move governed instance settings and optional tenant configuration across environments. They are specifically **not** database dumps, secret bundles, subject-data exports, or infrastructure snapshots.
 
 ---
 
 ## What Belongs in a Manifest
 
 Only allowlisted instance/tenant settings and approved typed documents belong in the manifest contract. Typical uses include reproducible policy, [white-labeling presentation tokens](../administration-and-branding/white-labeling.md), email templates, and feature flags that the application explicitly recognizes through the [Administration Console](../administration-and-branding/admin-guide.md).
+
+The instance section is required. A tenant list is optional: leaving out
+`spec.tenants` or supplying `[]` requests no tenant actions. Explicit `null`,
+invalid tenant entries and duplicate tenant slugs are rejected. Leaving out a
+tenant does not delete it, change the selected tenant, remove its grants or reset
+its configuration. Use the authorized tenant administration workflow for lifecycle
+changes.
 
 ---
 
@@ -27,6 +34,9 @@ documents. Removing a row removes that tenant from the prepared manifest. Tenant
 identifiers must be unique lowercase slugs. Event permits up to 256 tenants;
 complex inputs may reach Configurator's resource budgets sooner. Operators do
 not need to invoke a development exporter to change the tenant count.
+
+For instance-only configuration, remove all tenant rows. This changes the prepared
+artifact's requested configuration, not the tenants already stored by Event.
 
 Review every artifact before use. Preparation checks the declared data shape;
 Event still owns semantic validation, authorization and deployment acceptance.

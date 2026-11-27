@@ -145,63 +145,6 @@
         }
       }
     },
-    "manifestExportMetadata": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "authorityScope",
-        "effectiveValuesFlattened",
-        "sensitiveValuesOmitted",
-        "sovereignLockedFields",
-        "sovereignValuesOmitted",
-        "view"
-      ],
-      "properties": {
-        "authorityScope": {
-          "const": "InstanceAndTenants"
-        },
-        "effectiveValuesFlattened": {
-          "type": "boolean"
-        },
-        "sensitiveValuesOmitted": {
-          "const": true
-        },
-        "sovereignLockedFields": {
-          "type": "array",
-          "minItems": 15,
-          "maxItems": 15,
-          "uniqueItems": true,
-          "items": {
-            "enum": [
-              "buyerAcceptance",
-              "chargeType",
-              "connectedAccounts",
-              "disputeHandling",
-              "liability",
-              "negativeBalances",
-              "officialOrigin",
-              "officialStatus",
-              "operatorIdentity",
-              "providerCredentials",
-              "providerHandoff",
-              "providerProfiles",
-              "reconciliation",
-              "refundExecution",
-              "saleControl"
-            ]
-          }
-        },
-        "sovereignValuesOmitted": {
-          "const": true
-        },
-        "view": {
-          "enum": [
-            "Overrides",
-            "Portable"
-          ]
-        }
-      }
-    },
     "moderationClass": {
       "type": "object",
       "additionalProperties": false,
@@ -1988,6 +1931,63 @@
         }
       }
     },
+    "tenantPackageExportMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorityScope",
+        "effectiveValuesFlattened",
+        "sensitiveValuesOmitted",
+        "sovereignLockedFields",
+        "sovereignValuesOmitted",
+        "view"
+      ],
+      "properties": {
+        "authorityScope": {
+          "const": "Tenant"
+        },
+        "effectiveValuesFlattened": {
+          "type": "boolean"
+        },
+        "sensitiveValuesOmitted": {
+          "const": true
+        },
+        "sovereignLockedFields": {
+          "type": "array",
+          "minItems": 15,
+          "maxItems": 15,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "buyerAcceptance",
+              "chargeType",
+              "connectedAccounts",
+              "disputeHandling",
+              "liability",
+              "negativeBalances",
+              "officialOrigin",
+              "officialStatus",
+              "operatorIdentity",
+              "providerCredentials",
+              "providerHandoff",
+              "providerProfiles",
+              "reconciliation",
+              "refundExecution",
+              "saleControl"
+            ]
+          }
+        },
+        "sovereignValuesOmitted": {
+          "const": true
+        },
+        "view": {
+          "enum": [
+            "Overrides",
+            "Portable"
+          ]
+        }
+      }
+    },
     "tenantPackageMetadata": {
       "type": "object",
       "additionalProperties": false,
@@ -1997,7 +1997,7 @@
       ],
       "properties": {
         "export": {
-          "$ref": "#/$defs/manifestExportMetadata"
+          "$ref": "#/$defs/tenantPackageExportMetadata"
         },
         "name": {
           "type": "string",

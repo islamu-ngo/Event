@@ -45,6 +45,7 @@ public static class ConfigurationManifestExportMetadataValues
 {
     public const string OverridesView = "Overrides";
     public const string PortableView = "Portable";
+    public const string InstanceAuthorityScope = "Instance";
     public const string InstanceAndTenantsAuthorityScope = "InstanceAndTenants";
     public const string TenantAuthorityScope = "Tenant";
 }
@@ -107,7 +108,7 @@ public sealed record ConfigurationManifestSpecV1Alpha2
 
     public required ConfigurationManifestInstanceV1Alpha2 Instance { get; init; }
 
-    public required IReadOnlyList<ConfigurationManifestTenantV1Alpha2> Tenants
+    public IReadOnlyList<ConfigurationManifestTenantV1Alpha2> Tenants
     {
         get => _tenants;
         init => _tenants = Snapshot.List(value);

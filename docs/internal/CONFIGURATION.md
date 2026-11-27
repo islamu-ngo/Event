@@ -440,18 +440,26 @@ not cached as successful absence. See [Secrets Management](SECRETS.md#runtime-re
 The governed editor and operator contract is
 [`schemas/configuration-manifest-v1alpha2.schema.json`](../../schemas/configuration-manifest-v1alpha2.schema.json).
 It uses JSON Schema Draft 2020-12 with immutable identifier
-`https://schemas.islamu.org/event/configuration-manifest/v1alpha1/schema.json`.
+`https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json`.
 That URL is currently an identifier, not a promise that a public endpoint serves the
 bytes. Documentation must not describe it as downloadable until deployment evidence
 proves the published bytes match the checked-in artifact.
 
 The current envelope is exact and case-sensitive:
 
-- `$schema`: `https://schemas.islamu.org/event/configuration-manifest/v1alpha1/schema.json`
-- `apiVersion`: `configuration.islamu.org/v1alpha1`
+- `$schema`: `https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json`
+- `apiVersion`: `configuration.islamu.org/v1alpha2`
 - `kind`: `ConfigurationManifest`
 - required `spec.instance.settings` and `spec.instance.documents` closed maps
-- required `spec.tenants` array containing one or more unique tenant entries
+- required `spec.instance.legalDocuments` closed map
+- optional `spec.tenants` array containing zero to 256 unique tenant entries
+
+The bounded wire codec normalizes omitted and empty tenant arrays to an immutable
+empty declaration. Raw JSON inspection rejects explicit null lists and null entries
+before normalization. Original uploaded bytes remain the provenance/digest source.
+No tenant declaration means no requested tenant action; it is not a cardinality,
+deletion, grant or tenant-selection instruction. Application validation, compiled
+plans and startup/import settlement must retain that meaning.
 
 The same envelope configures single-tenant and multi-tenant deployments. The
 instance and tenant catalogs are independent explicit allowlists; adding a
@@ -2744,6 +2752,12 @@ placeholder UI.
 sealed Global import owner and reads within that owner's Serializable transaction.
 Both Overrides and Portable comparison snapshots retain that owner; they never
 retarget the request's Runtime tenant context.
+
+The production JSON context uses a spec converter to distinguish omitted tenants
+from explicit null before constructing immutable wire records. Omission becomes
+an empty read-only snapshot; explicit null and null entries fail decoding. The
+converter retains the closed member set and always writes the tenant array,
+without relying on omitted init-only property initializers in .NET 10.
 
 Portable resolution reaches `InstanceTenantSettingsReader`. For a sealed import
 owner, it reuses the scoped `SystemSettingRepository.GetAllSettings` EF read and

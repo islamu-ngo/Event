@@ -34,4 +34,21 @@ public sealed class ConfigurationManifestSchemaArtifactTests
         await Assert.That(properties.GetProperty("kind").GetProperty("const").GetString())
             .IsEqualTo(kind);
     }
+
+    [Test]
+    public async Task PublishedTenantPackageSchema_RequiresTenantAuthorityInExportMetadata()
+    {
+        using JsonDocument schema = JsonDocument.Parse(await File.ReadAllBytesAsync(
+            ContextSystemHelpers.RepoPath("schemas", "tenant-configuration-package-v1alpha2.schema.json")));
+        JsonElement root = schema.RootElement;
+        JsonElement metadata = ConfigurationManifestSchemaGenerationTests.ResolveDefinition(
+            root, root.GetProperty("properties").GetProperty("metadata"));
+        JsonElement export = ConfigurationManifestSchemaGenerationTests.ResolveDefinition(
+            root, metadata.GetProperty("properties").GetProperty("export"));
+
+        await Assert.That(export.GetProperty("required").EnumerateArray()
+            .Select(value => value.GetString()!).ToArray()).Contains("authorityScope");
+        await Assert.That(export.GetProperty("properties").GetProperty("authorityScope")
+            .GetProperty("const").GetString()).IsEqualTo("Tenant");
+    }
 }

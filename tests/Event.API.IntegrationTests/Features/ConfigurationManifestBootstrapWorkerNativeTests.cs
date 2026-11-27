@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Event.Persistence.IntegrationTests;
@@ -91,7 +93,7 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
             await Assert.That(instructions.NotificationTimeUtc).IsEqualTo(scenario.Receipt.StartedAt);
             await Assert.That(instructions.InstanceSettingKeys).IsEquivalentTo([ThemeKey]);
             await Assert.That(instructions.Tenants.Length).IsEqualTo(1);
-            await Assert.That(instructions.Tenants[0].TenantId).IsEqualTo(scenario.Receipt.TenantId);
+            await Assert.That(instructions.Tenants[0].TenantId).IsEqualTo(scenario.Receipt.TenantId!.Value);
             await Assert.That(instructions.Tenants[0].SettingKeys)
                 .IsEquivalentTo([PublicExperienceSettingDefinitions.EventCatalogLabel.Key]);
             await Assert.That(effect.Status).IsEqualTo(claim.Status);
@@ -104,6 +106,43 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
 
         await scenario.ProcessAsync(claim);
         await scenario.AssertCompletedAsync(expectedRetryCount: 0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task InstanceOnlyEffectSettlesThroughTenantlessRuntime(bool explicitEmptyTenants)
+    {
+        await using var scenario = await CreateScenarioAsync(explicitEmptyTenants);
+        GenericOutboxClaim claim = await scenario.ClaimAsync();
+        await Assert.That(claim.Ownership).IsEqualTo(GenericOutboxOwnership.Instance);
+        await Assert.That(claim.TenantId).IsNull();
+        await Assert.That(claim.SourceId).IsEqualTo(scenario.Receipt.OperationId);
+
+        await using (var preparation = scenario.Services.CreateAsyncScope())
+        await using (var execution = await preparation.ServiceProvider
+            .GetRequiredService<IGenericOutboxExecutionScopeFactory>().CreateAsync(claim, Token))
+        {
+            var context = execution.Services.GetRequiredService<ExploreDbContext>();
+            await Assert.That(context.TenantFilterTenantId).IsNull();
+            await Assert.That(context.IsTenantFilterBypassed).IsFalse();
+            await context.Database.OpenConnectionAsync(Token);
+            await using var probe = context.Database.GetDbConnection().CreateCommand();
+            probe.Transaction = context.Database.CurrentTransaction?.GetDbTransaction();
+            probe.CommandText = """
+                SELECT current_user::text
+                WHERE NULLIF(pg_catalog.current_setting('app.current_tenant_id', true), '') IS NULL
+                """;
+            await Assert.That((string?)await probe.ExecuteScalarAsync(Token))
+                .IsEqualTo(fixture.NativeQueueEnrollment.RuntimeLogin);
+        }
+
+        await scenario.ProcessAsync(claim);
+        await scenario.AssertCompletedAsync(expectedRetryCount: 0);
+        await using var observer = fixture.CreateDbContext();
+        await Assert.That(await observer.Tenants.IgnoreQueryFilters().AnyAsync(Token)).IsFalse();
+        await Assert.That(await observer.TenantUsers.IgnoreQueryFilters().AnyAsync(Token)).IsFalse();
+        await Assert.That(await observer.TenantUserRoleGrants.IgnoreQueryFilters().AnyAsync(Token)).IsFalse();
     }
 
     [Test]
@@ -275,11 +314,12 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
         }
     }
 
-    private async Task<Scenario> CreateScenarioAsync()
+    private async Task<Scenario> CreateScenarioAsync(bool? explicitEmptyTenants = null)
     {
         await fixture.ResetAsync();
         await using (var seed = fixture.CreateDbContext())
         {
+            seed.BindTenantLease();
             var definition = AppearanceSettingDefinitions.DefaultThemeMode;
             SystemSetting? theme = await seed.SystemSettings.SingleOrDefaultAsync(row => row.SettingKey == ThemeKey, Token);
             if (theme is null)
@@ -343,15 +383,37 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
                     ]
                 }
             };
-            using var input = new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(manifest,
-                ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2));
-            ConfigurationManifestReadResult source = await new ConfigurationManifestReader()
-                .ReadStreamAsync(input, ConfigurationManifestMode.Bootstrap, Token);
-            var applied = await bootstrap.ExecuteAsync(new ApplyConfigurationManifestCommand(source), Token);
-            await Assert.That(applied.IsSuccess).IsTrue();
-            ReceiptSnapshot receipt = await ReadReceiptAsync(fixture, applied.Id);
+            ReceiptSnapshot receipt;
+            if (explicitEmptyTenants is { } explicitEmpty)
+            {
+                var artifact = JsonSerializer.SerializeToNode(manifest,
+                    ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2)!.AsObject();
+                var spec = artifact["spec"]!.AsObject();
+                if (explicitEmpty)
+                    spec["tenants"] = new JsonArray();
+                else
+                    spec.Remove("tenants");
+                byte[] bytes = Encoding.UTF8.GetBytes(artifact.ToJsonString());
+                await File.WriteAllBytesAsync(bootstrap.ArtifactPath, bytes, Token);
+                await using var startup = bootstrap.Services.CreateAsyncScope();
+                await startup.ServiceProvider.GetRequiredService<IConfigurationManifestStartupRunner>().RunAsync(Token);
+                await using var observer = fixture.CreateDbContext();
+                Guid id = await observer.ConfigurationManifestOperations.Select(row => row.Id).SingleAsync(Token);
+                receipt = await ReadReceiptAsync(fixture, id, expectTenant: false);
+                await Assert.That(receipt.Digest).IsEqualTo(Convert.ToHexStringLower(SHA256.HashData(bytes)));
+            }
+            else
+            {
+                using var input = new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(manifest,
+                    ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2));
+                ConfigurationManifestReadResult source = await new ConfigurationManifestReader()
+                    .ReadStreamAsync(input, ConfigurationManifestMode.Bootstrap, Token);
+                var applied = await bootstrap.ExecuteAsync(new ApplyConfigurationManifestCommand(source), Token);
+                await Assert.That(applied.IsSuccess).IsTrue();
+                receipt = await ReadReceiptAsync(fixture, applied.Id);
+                await Assert.That(receipt.Digest).IsEqualTo(bootstrap.ArtifactDigest);
+            }
             await Assert.That(receipt.Status).IsEqualTo(ConfigurationManifestOperationStatus.Applied);
-            await Assert.That(receipt.Digest).IsEqualTo(bootstrap.ArtifactDigest);
             await Assert.That(receipt.EffectId).IsNotNull();
             var scenario = new Scenario(fixture, services, cache, receipt);
             OutboxMessage pending = await scenario.ReadEffectAsync();
@@ -361,7 +423,16 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
             await Assert.That(pending.ProcessedAt).IsNull();
             var instructions = ConfigurationManifestEffectPayload.Read(pending.Payload, pending.CreatedAt);
             await Assert.That(instructions.NotificationTimeUtc).IsEqualTo(receipt.StartedAt);
-            await Assert.That(instructions.Tenants.Select(tenant => tenant.TenantId)).IsEquivalentTo([receipt.TenantId]);
+            if (explicitEmptyTenants is not null)
+            {
+                await Assert.That(instructions.Tenants.Length).IsEqualTo(0);
+                await Assert.That(instructions.InstanceSettingKeys).IsEquivalentTo([ThemeKey]);
+            }
+            else
+            {
+                await Assert.That(instructions.Tenants.Select(tenant => tenant.TenantId))
+                    .IsEquivalentTo([receipt.TenantId!.Value]);
+            }
             await Assert.That(pending.AggregateType).IsEqualTo(ConfigurationManifestEffectOutbox.AggregateType);
             await Assert.That(pending.EventType).IsEqualTo(ConfigurationManifestEffectOutbox.EventType);
             await Assert.That(pending.AggregateId).IsEqualTo(receipt.OperationId);
@@ -439,20 +510,27 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
             new AtprotoFederationSettingRepository(context, null));
     }
 
-    private static async Task<ReceiptSnapshot> ReadReceiptAsync(PostgreSqlContainerFixture database, Guid operationId)
+    private static async Task<ReceiptSnapshot> ReadReceiptAsync(PostgreSqlContainerFixture database, Guid operationId,
+        bool expectTenant = true)
     {
         await using var observer = database.CreateDbContext();
         var operation = await observer.ConfigurationManifestOperations.AsNoTracking()
             .SingleAsync(row => row.Id == operationId, Token);
-        var result = await observer.ConfigurationManifestTenantResults.AsNoTracking()
-            .SingleAsync(row => row.OperationId == operationId, Token);
+        var results = observer.ConfigurationManifestTenantResults.AsNoTracking();
+        if (!expectTenant)
+        {
+            await Assert.That(await results.IgnoreQueryFilters().AnyAsync(Token)).IsFalse();
+            return new(operation.Id, operation.Digest, operation.Status, operation.CompletedAt, operation.StartedAt,
+                operation.EffectOutboxId, null, null, null);
+        }
+        var result = await results.SingleAsync(row => row.OperationId == operationId, Token);
         await Assert.That(result.Status).IsEqualTo(ConfigurationManifestTenantResultStatus.Created);
         return new(operation.Id, operation.Digest, operation.Status, operation.CompletedAt, operation.StartedAt, operation.EffectOutboxId,
             result.Id, result.TenantId, string.Join(",", result.ChangedKeyNames));
     }
 
     private sealed record ReceiptSnapshot(Guid OperationId, string Digest, ConfigurationManifestOperationStatus Status,
-        DateTime CompletedAt, DateTime StartedAt, Guid? EffectId, Guid ResultId, Guid TenantId, string ChangedKeys);
+        DateTime CompletedAt, DateTime StartedAt, Guid? EffectId, Guid? ResultId, Guid? TenantId, string? ChangedKeys);
 
     private sealed class Scenario(PostgreSqlContainerFixture database, ServiceProvider services,
         FaultingMemoryCache cache, ReceiptSnapshot receipt) : IAsyncDisposable
@@ -487,7 +565,8 @@ public sealed class ConfigurationManifestBootstrapWorkerNativeTests(PostgreSqlCo
 
         internal async Task AssertReceiptUnchangedAsync()
         {
-            await Assert.That(await ReadReceiptAsync(database, receipt.OperationId)).IsEqualTo(receipt);
+            await Assert.That(await ReadReceiptAsync(database, receipt.OperationId, expectTenant: receipt.ResultId.HasValue))
+                .IsEqualTo(receipt);
             await using var observer = database.CreateDbContext();
             string? persisted = await observer.SystemSettings.AsNoTracking().Where(row => row.SettingKey == ThemeKey)
                 .Select(row => row.Value).SingleAsync(Token);

@@ -5,6 +5,7 @@ using System.Text.Json;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
+using Explore.Application.Features.ConfigurationManifest.Validation;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Domain;
 using Explore.Domain.Settings;
@@ -221,11 +222,50 @@ public sealed class ConfigurationManifestSchemaGenerationTests
                 .Order(StringComparer.Ordinal)
                 .ToArray())
             .IsEquivalentTo(required.Order(StringComparer.Ordinal).ToArray());
-        await Assert.That(exportedMetadata.GetProperty("authorityScope").GetString())
-            .IsEqualTo(metadataSchema.GetProperty("properties")
-                .GetProperty("authorityScope")
-                .GetProperty("const")
-                .GetString());
+        string[] admittedScopes = metadataSchema.GetProperty("properties")
+            .GetProperty("authorityScope").GetProperty("enum")
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+        await Assert.That(admittedScopes)
+            .IsEquivalentTo(["Instance", "InstanceAndTenants"]);
+        await Assert.That(admittedScopes)
+            .Contains(exportedMetadata.GetProperty("authorityScope").GetString()!);
+    }
+
+    [Test]
+    public async Task GeneratedManifestSchema_TenantListMayBeOmittedOrEmpty()
+    {
+        using JsonDocument schema = JsonDocument.Parse(
+            ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest());
+        JsonElement root = schema.RootElement;
+        JsonElement spec = ResolveDefinition(root, root.GetProperty("properties").GetProperty("spec"));
+        JsonElement tenants = spec.GetProperty("properties").GetProperty("tenants");
+
+        await Assert.That(spec.GetProperty("required").EnumerateArray()
+            .Select(value => value.GetString()!).ToArray()).IsEquivalentTo(["instance"]);
+        await Assert.That(tenants.GetProperty("type").GetString()).IsEqualTo("array");
+        await Assert.That(tenants.TryGetProperty("minItems", out JsonElement minimum)
+            ? minimum.GetInt32() : 0).IsEqualTo(0);
+        await Assert.That(tenants.GetProperty("maxItems").GetInt32())
+            .IsEqualTo(ConfigurationManifestValidator.MaximumTenantCount);
+    }
+
+    [Test]
+    public async Task GeneratedManifestSchema_OnlyInstanceExportScopeRestrictsTenantsToZero()
+    {
+        using JsonDocument schema = JsonDocument.Parse(
+            ConfigurationManifestJsonSchemaGenerator.GenerateConfigurationManifest());
+        JsonElement root = schema.RootElement;
+        JsonElement exportGuard = root.GetProperty("if").GetProperty("properties")
+            .GetProperty("metadata");
+
+        await Assert.That(exportGuard.GetProperty("required").EnumerateArray()
+            .Select(value => value.GetString()!).ToArray()).Contains("export");
+        await Assert.That(exportGuard.GetProperty("properties").GetProperty("export")
+            .GetProperty("properties").GetProperty("authorityScope")
+            .GetProperty("const").GetString()).IsEqualTo("Instance");
+        await Assert.That(root.GetProperty("then").GetProperty("properties")
+            .GetProperty("spec").GetProperty("properties").GetProperty("tenants")
+            .GetProperty("maxItems").GetInt32()).IsEqualTo(0);
     }
 
     [Test]
@@ -370,6 +410,10 @@ public sealed class ConfigurationManifestSchemaGenerationTests
         await Assert.That(text).DoesNotContain("targetInstanceId");
         await Assert.That(AllTypedObjectsAreClosed(schema.RootElement)).IsTrue();
     }
+
+    internal static JsonElement ResolveDefinition(JsonElement root, JsonElement reference) =>
+        root.GetProperty("$defs")
+            .GetProperty(reference.GetProperty("$ref").GetString()!.Split('/')[^1]);
 
     private static bool AllTypedObjectsAreClosed(JsonElement element)
     {

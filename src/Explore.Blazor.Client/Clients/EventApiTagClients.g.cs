@@ -19008,11 +19008,11 @@ namespace Explore.Blazor.Client.Clients
         /// Export configuration manifest
         /// </summary>
         /// <remarks>
-        /// Downloads the current instance and all active tenants as explicit overrides or a flattened portable view.
+        /// Downloads instance configuration as overrides or a flattened portable view. Include eligible tenants only with explicit combined scope.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> ExportConfigurationManifestAsync(ConfigurationManifestExportView? view = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<FileResponse> ExportConfigurationManifestAsync(ConfigurationManifestExportView? view = null, ConfigurationManifestExportScope? scope = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>Created</returns>
@@ -19093,11 +19093,11 @@ namespace Explore.Blazor.Client.Clients
         /// Export configuration manifest
         /// </summary>
         /// <remarks>
-        /// Downloads the current instance and all active tenants as explicit overrides or a flattened portable view.
+        /// Downloads instance configuration as overrides or a flattened portable view. Include eligible tenants only with explicit combined scope.
         /// </remarks>
         /// <returns>OK</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> ExportConfigurationManifestAsync(ConfigurationManifestExportView? view = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<FileResponse> ExportConfigurationManifestAsync(ConfigurationManifestExportView? view = null, ConfigurationManifestExportScope? scope = null, string? api_version = null, string? x_Api_Version = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -19119,6 +19119,10 @@ namespace Explore.Blazor.Client.Clients
                     if (view != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("view")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (scope != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("scope")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(scope, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     if (api_version != null)
                     {
@@ -183579,6 +183583,18 @@ namespace Explore.Blazor.Client.Clients
             return false;
         }
 }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ConfigurationManifestExportScope
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Instance")]
+        Instance = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"InstanceAndTenants")]
+        InstanceAndTenants = 1,
+
+    }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum ConfigurationManifestExportView

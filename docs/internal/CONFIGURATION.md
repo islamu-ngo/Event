@@ -440,18 +440,46 @@ not cached as successful absence. See [Secrets Management](SECRETS.md#runtime-re
 The governed editor and operator contract is
 [`schemas/configuration-manifest-v1alpha2.schema.json`](../../schemas/configuration-manifest-v1alpha2.schema.json).
 It uses JSON Schema Draft 2020-12 with immutable identifier
-`https://schemas.islamu.org/event/configuration-manifest/v1alpha1/schema.json`.
+`https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json`.
 That URL is currently an identifier, not a promise that a public endpoint serves the
 bytes. Documentation must not describe it as downloadable until deployment evidence
 proves the published bytes match the checked-in artifact.
 
 The current envelope is exact and case-sensitive:
 
-- `$schema`: `https://schemas.islamu.org/event/configuration-manifest/v1alpha1/schema.json`
-- `apiVersion`: `configuration.islamu.org/v1alpha1`
+- `$schema`: `https://schemas.islamu.org/event/configuration-manifest/v1alpha2/schema.json`
+- `apiVersion`: `configuration.islamu.org/v1alpha2`
 - `kind`: `ConfigurationManifest`
 - required `spec.instance.settings` and `spec.instance.documents` closed maps
-- required `spec.tenants` array containing one or more unique tenant entries
+- required `spec.instance.legalDocuments` closed map
+- optional `spec.tenants` array containing zero to 256 unique tenant entries
+
+The bounded wire codec normalizes omitted and empty tenant arrays to an immutable
+empty declaration. Raw JSON inspection rejects explicit null lists and null entries
+before normalization. Original uploaded bytes remain the provenance/digest source.
+No tenant declaration means no requested tenant action; it is not a cardinality,
+deletion, grant or tenant-selection instruction. Application validation, compiled
+plans and startup/import settlement must retain that meaning.
+
+Export view and scope are independent. `Overrides` and `Portable` control value
+projection. `Instance` is the default public scope and must avoid tenant enumeration,
+tenant leases and tenant legal/moderation projection. `InstanceAndTenants` explicitly
+includes bounded eligible tenant configuration and is valid when the result has
+zero tenants. The existing exact tenant-package operation remains separate.
+Manifest export metadata records `authorityScope` as `Instance` or
+`InstanceAndTenants`; `Instance` with nonempty tenants is invalid. Tenant packages
+require `Tenant` metadata. These declarations describe an artifact, never authorize
+an import or select its target.
+
+Internal import snapshot extent is a required operation input, without a public
+export default. Validate the admitted source sections before selecting a current
+snapshot. Instance-only operations observe instance configuration; admitted tenant
+sections retain the selected owner's bounded combined snapshot. Preserve that
+extent through fresh preview, post-write verification and retained rollback bytes,
+including tenant-moderation-only operations. Snapshot narrowing never weakens an
+instance policy mutation's checks against omitted existing tenant policies.
+Keep the original credential, physical context, serializable transaction, preview
+binding, exact mapped targets and atomic effect/receipt fences.
 
 The same envelope configures single-tenant and multi-tenant deployments. The
 instance and tenant catalogs are independent explicit allowlists; adding a
@@ -2688,7 +2716,9 @@ authorities. In particular, there is no manifest stop-sale boolean; use the
 audited stop/resume/review workflows for operational governance.
 
 Exports make this boundary machine-readable. `metadata.export.authorityScope`
-is `InstanceAndTenants`, `sovereignValuesOmitted` is `true`, and
+is `Instance` for the default instance-only manifest, `InstanceAndTenants` for
+an explicitly combined manifest, and `Tenant` for an exact tenant package.
+`sovereignValuesOmitted` is `true`, and
 `sovereignLockedFields` carries the fixed platform-owned field taxonomy.
 Overrides emits a paid-policy document only when an active tenant narrowing
 exists. Portable emits the active tenant narrowing or the flattened active
@@ -2744,6 +2774,83 @@ placeholder UI.
 sealed Global import owner and reads within that owner's Serializable transaction.
 Both Overrides and Portable comparison snapshots retain that owner; they never
 retarget the request's Runtime tenant context.
+
+Snapshot entry captures the original request, principal, identity references and
+provider account before owner acquisition. Acquisition rechecks that custody after
+its asynchronous boundaries; disclosure rechecks the same live credential after
+the child scope has finished asynchronous disposal.
+
+Snapshot scope is a required argument. The import service first parses the source
+and admits selected section keys against its available sections, then requests
+`InstanceAndTenants` only when an admitted tenant section is selected. Instance-only
+selections request `Instance`, so comparison cannot indirectly enumerate tenants.
+Apply verification retains that original extent even when moderation sections are
+removed from the ordinary fidelity comparison. This preserves the complete tenant
+snapshot for a tenant-moderation-only apply without broadening instance-only work.
+
+Public manifest downloads use a separate `ConfigurationManifestExportExecutor`.
+It binds a fresh tenantless Global context to the original resolved human and
+validated credential with the dedicated `ConfigurationManifestExport` purpose.
+The same Serializable transaction checks current persisted administrator authority
+before and after buffering the artifact. The original request, credential and
+lifetime remain required after reads and child-scope disposal, before disclosure.
+This owner does not borrow import authority or retarget the caller's Runtime
+context. Instance scope omits tenant catalogue, lease, legal and moderation reads
+at their source; combined scope explicitly uses the existing tenant readers.
+
+Manifest legal output uses bounded current-source projections rather than loading
+legal aggregates, historical versions or publication records. The PostgreSQL
+migrator grants the ordinary Global and Runtime logins column-level SELECT on only the legal
+document pointer, portable version fields and localized source fields. Existing
+forced tenant RLS remains in effect. The EF join selects `CurrentVersion`; tenant
+sources in public combined exports use their existing tenant-bound child readers.
+Import snapshots retain their sealed source routine and original transaction;
+public export does not enroll in or impersonate that import capability.
+
+These fixed column grants permit credential-level reads of historical
+legal source fields within each login's RLS scope. Current-version selection is an
+application projection, not a claim that database permissions conceal that history.
+This is the existing application-owned persistence trade-off: a compromised Global
+or tenant-bound Runtime credential can read its granted source fields within its
+database scope, while C# checks the human
+and permitted export before disclosure. No Runtime identity/privacy grants or
+table-wide Global legal grants are added.
+
+The production JSON context uses a spec converter to distinguish omitted tenants
+from explicit null before constructing immutable wire records. Omission becomes
+an empty read-only snapshot; explicit null and null entries fail decoding. The
+converter retains the closed member set and always writes the tenant array,
+without relying on omitted init-only property initializers in .NET 10.
+
+Ordinary PostgreSQL branding export uses `PostgresTenantBrandingReadContract`.
+Column grants cannot distinguish branding payloads from directory identity in
+`tenant_settings_documents`, so preparation installs a branding-only barrier view.
+A non-login, non-bypass owner has only the fixed source columns; Runtime can select
+the view without joining that role or reading the base payload column. The existing
+forced tenant policy still filters the owner's rows. Each read checks the live
+view, role, column and RLS contract and retains the original tenant, connection and
+transaction, including when branding is absent. Only an exact branding-only key
+request uses this source; mixed and identity reads retain their existing owners.
+The view supplies storage isolation, while C# retains export authorization.
+
+Paid-policy configuration reads use
+`IPaidEventPolicyRepository.GetActiveForConfigurationExportAsync`. Ordinary
+readers project only active policy configuration and ordered child values through
+EF, then restore an untracked Domain evaluation aggregate. Actor audit columns
+are neither selected nor granted. PostgreSQL preparation grants these fixed
+columns to the configured Global and Runtime logins while retaining forced tenant
+RLS; it adds no write permission or import-role membership. Sealed PostgreSQL
+import snapshots retain their existing native read on the original transaction.
+Mutation callers keep their separate tracked policy reads.
+
+Overrides read only admitted stored instance keys through
+`ISystemSettingRepository.GetByKeysForConfigurationExportAsync`. Ordinary
+PostgreSQL exports reuse the existing selected-context settings hierarchy read;
+sealed import owners retain their filtered EF read on the original transaction.
+Public manifest and tenant-package downloads use the current-configuration name
+`current-instance`; they do not read operation history solely to obtain the last
+bootstrap's name. Internal comparison snapshots retain their existing provenance
+read under sealed import authority.
 
 Portable resolution reaches `InstanceTenantSettingsReader`. For a sealed import
 owner, it reuses the scoped `SystemSettingRepository.GetAllSettings` EF read and

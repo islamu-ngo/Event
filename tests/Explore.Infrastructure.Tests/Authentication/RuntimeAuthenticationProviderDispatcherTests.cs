@@ -164,6 +164,10 @@ public sealed class RuntimeAuthenticationProviderDispatcherTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<SystemSetting>> GetByKeysForConfigurationExportAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<bool> IsLocked(
             string key,
             CancellationToken cancellationToken = default) =>

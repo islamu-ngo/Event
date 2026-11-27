@@ -13,10 +13,13 @@ using Microsoft.EntityFrameworkCore.Storage;
 public sealed class TenantSettingsDocumentRepository : GenericRepository<TenantSettingsDocument, Guid>, ITenantSettingsDocumentRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly PostgresNativeQueueEnrollment? _enrollment;
 
-    public TenantSettingsDocumentRepository(ExploreDbContext dbContext) : base(dbContext)
+    public TenantSettingsDocumentRepository(ExploreDbContext dbContext,
+        PostgresNativeQueueEnrollment? enrollment = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _enrollment = enrollment;
     }
 
     public async Task<TenantSettingsDocument> ApplyBrandingImportAsync(
@@ -207,5 +210,23 @@ public sealed class TenantSettingsDocumentRepository : GenericRepository<TenantS
             .AsNoTracking()
             .Where(document => document.TenantId == tenantId && keys.Contains(document.DocumentKey))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TenantSettingsDocument>> GetManyForConfigurationExportAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> documentKeys,
+        CancellationToken cancellationToken)
+    {
+        // A tenant-bound PostgreSQL export reads branding through the enrolled column-bounded
+        // view; every other shape keeps the ordinary exact-tenant read.
+        if (documentKeys.Distinct(StringComparer.Ordinal).ToArray() is not [SettingsDocumentKeys.Tenant.Branding]
+            || !_dbContext.Database.IsNpgsql() || _dbContext.IsConfigurationInstanceImportOwner
+            || _dbContext.IsTenantFilterBypassed || _dbContext.TenantFilterTenantId is not { } boundTenant)
+            return await GetManyForTenant(tenantId, documentKeys, cancellationToken);
+        if (boundTenant != tenantId)
+            throw new UnauthorizedAccessException("configuration_export_tenant_scope_mismatch");
+        return await PostgresTenantBrandingReadContract.ReadAsync(_dbContext,
+            _enrollment ?? throw new UnauthorizedAccessException("tenant_branding_read_enrollment_required"),
+            tenantId, cancellationToken);
     }
 }

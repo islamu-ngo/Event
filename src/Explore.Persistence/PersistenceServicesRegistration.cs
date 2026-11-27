@@ -14,6 +14,7 @@ using Explore.Application.Contracts.SetupLive;
 using Explore.Application.Contracts.Waitlist;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Managed;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Domain;
 using Explore.Persistence.Caching;
 using Explore.Persistence.Database;
@@ -48,6 +49,9 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IHumanTenantPreferenceStore, HumanTenantPreferenceStore>();
         services.AddScoped<IConfigurationManifestTenantReadScopeFactory, ConfigurationManifestTenantReadScopeFactory>();
         services.AddScoped<IConfigurationInstanceImportExecutor, ConfigurationInstanceImportExecutor>();
+        services.AddScoped<IConfigurationManifestExportExecutor, ConfigurationManifestExportExecutor>();
+        services.AddScoped<IConfigurationManifestPackageAuthority, ConfigurationManifestPackageAuthority>();
+        services.AddScoped<IConfigurationManifestPackageModerationReader, ConfigurationManifestPackageModerationReader>();
         return services;
     }
 
@@ -440,11 +444,13 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IModerationPolicyPublicationRepository>(provider =>
         {
             var context = provider.GetRequiredService<ExploreDbContext>();
-            if (context.IsConfigurationInstanceImportOwner)
+            var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
+            if (context.IsConfigurationInstanceImportOwner
+                || lease.HumanScope?.Purpose == HumanAdministratorCommitPurpose.ConfigurationManifestExport)
             {
-                var lease = provider.GetRequiredService<ExploreDbContextExecutionLease>();
                 if (lease.HumanScope is null || lease.HumanLifetime is null)
                     throw new UnauthorizedAccessException("Instance export requires its original authenticated owner.");
+                lease.RequireOriginalOwner(context);
                 return new ModerationPolicyPublicationRepository(
                     context,
                     provider.GetRequiredService<IAdminContext>(),

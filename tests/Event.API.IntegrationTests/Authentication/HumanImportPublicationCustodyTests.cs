@@ -62,7 +62,7 @@ public sealed class HumanImportPublicationCustodyTests
         lease.Bind(context, null);
         lease.BindHuman(human.Subject!, HumanAdministratorCommitPurpose.ConfigurationImport, null, fixture.Lifetime);
         var snapshot = await scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>()
-            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, default);
+            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var manifest = JsonNode.Parse(snapshot.Utf8Json.Span)!;
         manifest["spec"]!["instance"]!["settings"] = new JsonObject
         {

@@ -1034,6 +1034,36 @@ client are the only browser contract source.
 ## Scope
 This document describes the full API behavior in `Explore.API`: the middleware pipeline, rate limiting, request timeouts, caching strategy, HATEOAS implementation, specification pattern, error handling, content negotiation, and client-generation flow.
 
+### Configuration Manifest Export Scope
+
+The authenticated instance-management GET
+`/api/admin/instance/configuration-manifest/export` retains operation ID
+`ExportConfigurationManifest`. Independent query parameters select `view`
+(`Overrides` or `Portable`) and `scope` (`Instance` or `InstanceAndTenants`).
+Their defaults are Overrides and Instance. Validate both enum values in the
+Application request as well as enforcing HTTP model binding; internal callers
+must not bypass the same contract.
+
+The existing instance-settings View permission and trusted export facts govern
+both scopes. Scope is disclosure intent, not new authority. Instance overview HAL
+offers each authorized view/scope pair explicitly. Existing
+`export-configuration-overrides` and `export-configuration-portable` relations
+select Instance; their `-with-tenants` counterparts select InstanceAndTenants.
+The BFF and client recheck the exact pair's GET link, rather than inferring a
+combined capability from an instance-only relation or a local role.
+
+Instance-only export reads no tenant configuration, including indirect legal and
+moderation projections. Combined export includes the bounded eligible tenant set
+and accepts an empty result. Exact tenant-package export still requires its real
+authorized target and cannot use this empty-result rule. Export metadata retains
+the requested authority scope independently of result cardinality.
+
+Responses retain the versioned manifest media type, private/no-store policy,
+control-plane rate limit and timeout, and complete bounded buffering before file
+disclosure. Invalid arguments remain Problem Details; oversize output retains
+`configuration_manifest_export_too_large`. No new route, instance identifier input
+or compatibility alias is introduced. Regenerate OpenAPI and clients together.
+
 ### Concurrency Request Headers
 
 Controllers using `EventControllerBase.TryParseConcurrencyStamp` require one

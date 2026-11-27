@@ -36,6 +36,15 @@ public interface ITenantSettingRepository
         IReadOnlyCollection<string> keys,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reads stored tenant overrides for configuration export on the context's bound tenant;
+    /// a tenant other than the bound one fails closed instead of returning no rows.
+    /// </summary>
+    Task<IReadOnlyList<TenantSetting>> GetByTenantAndKeysForConfigurationExportAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> keys,
+        CancellationToken cancellationToken);
+
     Task<List<TenantSetting>> GetByKeyAcrossTenants(
         string key,
         CancellationToken cancellationToken = default);

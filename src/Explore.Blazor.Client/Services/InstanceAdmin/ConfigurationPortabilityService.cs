@@ -185,7 +185,8 @@ internal sealed class ConfigurationPortabilityService(
     {
         if (scope == ConfigurationImportScope.Instance)
         {
-            return (await manifestExports.DownloadAsync(view, cancellationToken)).Started;
+            return (await manifestExports.DownloadAsync(
+                view, ConfigurationManifestExportScope.Instance, cancellationToken)).Started;
         }
 
         ConfigurationPortabilityCapabilities capabilities =

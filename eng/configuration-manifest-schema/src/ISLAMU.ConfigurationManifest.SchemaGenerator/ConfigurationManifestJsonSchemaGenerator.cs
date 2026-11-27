@@ -218,6 +218,44 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
             ["additionalProperties"] = false,
             ["required"] = Strings(["$schema", "apiVersion", "kind", "metadata", "spec"]),
             ["properties"] = rootProperties,
+            ["if"] = new JsonObject
+            {
+                ["properties"] = new JsonObject
+                {
+                    ["metadata"] = new JsonObject
+                    {
+                        ["required"] = Strings(["export"]),
+                        ["properties"] = new JsonObject
+                        {
+                            ["export"] = new JsonObject
+                            {
+                                ["required"] = Strings(["authorityScope"]),
+                                ["properties"] = new JsonObject
+                                {
+                                    ["authorityScope"] = new JsonObject
+                                    {
+                                        ["const"] = ConfigurationManifestExportMetadataValues
+                                            .InstanceAuthorityScope
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            ["then"] = new JsonObject
+            {
+                ["properties"] = new JsonObject
+                {
+                    ["spec"] = new JsonObject
+                    {
+                        ["properties"] = new JsonObject
+                        {
+                            ["tenants"] = new JsonObject { ["maxItems"] = 0 }
+                        }
+                    }
+                }
+            },
             ["$defs"] = BuildDefinitions(
                 instanceSettings,
                 instanceDocuments,
@@ -235,13 +273,16 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
             ["brandingPayload"] = BrandingPayloadSchema(),
             ["legalDocumentLocalizedSource"] = LegalDocumentLocalizedSourceSchema(),
             ["legalTemplateProvenance"] = LegalTemplateProvenanceSchema(),
-            ["manifestExportMetadata"] = ManifestExportMetadataSchema(),
             ["paidEventPolicyCurrencyRiskLimit"] = PaidEventPolicyCurrencyRiskLimitSchema(),
             ["paidEventPolicyPayload"] = PaidEventPolicyPayloadSchema(),
             ["tenantBrandingDocument"] = BrandingDocumentSchema(),
             ["tenantDocuments"] = TenantDocumentsSchema(tenantDocuments),
             ["tenantLegalDocuments"] =
                 LegalDocumentsSchema(LegalDocumentScope.Tenant),
+            ["tenantPackageExportMetadata"] = ExportMetadataSchema(new JsonObject
+            {
+                ["const"] = ConfigurationManifestExportMetadataValues.TenantAuthorityScope
+            }),
             ["tenantPackageMetadata"] = TenantPackageMetadataSchema(),
             ["tenantPackageSource"] = TenantPackageSourceSchema(),
             ["tenantPackageSpec"] = TenantPackageSpecSchema(),
@@ -301,7 +342,14 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
             ["instanceSettings"] = SettingsSchema(instanceSettings),
             ["legalDocumentLocalizedSource"] = LegalDocumentLocalizedSourceSchema(),
             ["legalTemplateProvenance"] = LegalTemplateProvenanceSchema(),
-            ["manifestExportMetadata"] = ManifestExportMetadataSchema(),
+            ["manifestExportMetadata"] = ExportMetadataSchema(new JsonObject
+            {
+                ["enum"] = Strings(
+                [
+                    ConfigurationManifestExportMetadataValues.InstanceAuthorityScope,
+                    ConfigurationManifestExportMetadataValues.InstanceAndTenantsAuthorityScope
+                ])
+            }),
             ["manifestInstance"] = ManifestInstanceSchema(),
             ["manifestMetadata"] = ManifestMetadataSchema(),
             ["manifestSpec"] = ManifestSpecSchema(),
@@ -339,7 +387,7 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
         ClosedObject(
             new JsonObject
             {
-                ["export"] = Ref("manifestExportMetadata"),
+                ["export"] = Ref("tenantPackageExportMetadata"),
                 ["name"] = BoundedString(
                     maximumLength: 100,
                     pattern: "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"),
@@ -376,15 +424,11 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
             },
             ["displayName", "documents", "legalDocuments", "settings"]);
 
-    private static JsonObject ManifestExportMetadataSchema() =>
+    private static JsonObject ExportMetadataSchema(JsonObject authorityScope) =>
         ClosedObject(
             new JsonObject
             {
-                ["authorityScope"] = new JsonObject
-                {
-                    ["const"] = ConfigurationManifestExportMetadataValues
-                        .InstanceAndTenantsAuthorityScope
-                },
+                ["authorityScope"] = authorityScope,
                 ["effectiveValuesFlattened"] = new JsonObject
                 {
                     ["type"] = "boolean"
@@ -437,12 +481,11 @@ public static partial class ConfigurationManifestJsonSchemaGenerator
                 ["tenants"] = new JsonObject
                 {
                     ["type"] = "array",
-                    ["minItems"] = 1,
                     ["maxItems"] = ConfigurationManifestValidator.MaximumTenantCount,
                     ["items"] = Ref("manifestTenant")
                 }
             },
-            ["instance", "tenants"]);
+            ["instance"]);
 
     private static JsonObject ManifestInstanceSchema() =>
         ClosedObject(

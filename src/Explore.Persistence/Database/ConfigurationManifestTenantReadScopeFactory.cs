@@ -16,10 +16,11 @@ internal sealed class ConfigurationManifestTenantReadScopeFactory(
         var scope = scopes.CreateAsyncScope();
         ExploreDbContext? context = null;
         bool captured = false;
+        var currentUser = provider.GetService<ICurrentUserService>();
         try
         {
             context = await tenantFactory.CreateDbContextAsync(tenantId, cancellationToken);
-            context.CurrentUserService = provider.GetService<ICurrentUserService>();
+            context.CurrentUserService = currentUser;
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().BindExecutionTenant(tenantId);
             scope.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>().Bind(context, tenantId);
             _ = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();

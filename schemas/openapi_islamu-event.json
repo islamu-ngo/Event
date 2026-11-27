@@ -16150,7 +16150,7 @@
           "Instance Configuration"
         ],
         "summary": "Export configuration manifest",
-        "description": "Downloads the current instance and all active tenants as explicit overrides or a flattened portable view.",
+        "description": "Downloads instance configuration as overrides or a flattened portable view. Include eligible tenants only with explicit combined scope.",
         "operationId": "ExportConfigurationManifest",
         "parameters": [
           {
@@ -16158,6 +16158,13 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/ConfigurationManifestExportView"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ConfigurationManifestExportScope"
             }
           },
           {
@@ -16190,67 +16197,121 @@
           "400": {
             "description": "Bad Request",
             "content": {
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json; v=0.1": {
+              "text/plain; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               },
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json": { }
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
             }
           },
           "401": {
             "description": "Unauthorized",
             "content": {
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json; v=0.1": {
+              "text/plain; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               },
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json": { }
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
             }
           },
           "403": {
             "description": "Forbidden",
             "content": {
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json; v=0.1": {
+              "text/plain; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               },
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json": { }
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
             }
           },
           "413": {
             "description": "Payload Too Large",
             "content": {
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json; v=0.1": {
+              "text/plain; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               },
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json": { }
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
             }
           },
           "429": {
             "description": "Too Many Requests",
             "content": {
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json; v=0.1": {
+              "text/plain; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               },
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json": { }
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
             }
           },
           "503": {
             "description": "Service Unavailable",
             "content": {
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json; v=0.1": {
+              "text/plain; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               },
-              "application/vnd.islamu.configuration-manifest.v1alpha2+json": { }
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
             }
           }
         },
@@ -144202,6 +144263,13 @@
       },
       "ConfigurationManagedApplyScheduleStatus": {
         "type": "integer"
+      },
+      "ConfigurationManifestExportScope": {
+        "enum": [
+          "Instance",
+          "InstanceAndTenants"
+        ],
+        "type": "string"
       },
       "ConfigurationManifestExportView": {
         "enum": [

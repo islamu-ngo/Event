@@ -134,11 +134,23 @@ schema artifacts are now regenerated natively from these complete source shapes.
 `ModerationConfigurationExportService` restores independently acquired retained
 history without exporting source readiness or native identities. Full-instance
 export qualifies native platform administration and explicitly owned tenant
-graphs; tenant export reads only the actual authorized request tenant. No tenant
+graphs; tenant export reads only the one authorized tenant. No tenant
 impersonation or provider-session mutation is used. An absent installation or
 selection omits optional meaning; malformed selected history fails closed.
 `ConfigurationManifestCurrentStateReader` holds one serializable read through
-artifact serialization. Import preview and fidelity use its original-transaction
+artifact serialization. A tenant package's Runtime snapshot cannot read role
+grants or moderation sources, so `IConfigurationManifestPackageModerationReader`
+reads the tenant's moderation definition on a fresh tenantless Global context in
+its own serializable transaction (no row fences), bracketed by
+`IConfigurationManifestPackageAuthority`. On SQLite that transaction is a deferred
+read transaction (`BeginTransaction(deferred: true)`): import preview and apply
+call the reader while their own transaction holds the database write lock, and a
+second `BEGIN IMMEDIATE` would wait on it until the busy timeout, whereas a
+read-only deferred transaction takes a consistent WAL read snapshot. It runs before the Runtime snapshot and
+again after serialization; the package fails closed with `Conflict` unless both
+reads return the same source publication ids. Republishing always mints a new
+publication id, so equal ids mean the package equals the state at the Runtime
+snapshot. Import preview and fidelity use its original-transaction
 participant methods when the coordinator already owns that transaction. Tenant
 previews read a tenant package directly, never a global manifest trimmed afterward.
 
@@ -1720,9 +1732,10 @@ locks. Run separate fresh `Global` authority checks before and after buffering
 the `Serializable` `Runtime` tenant snapshot (plus original credential and
 lifetime checks), staying within `Global`'s existing column allowlist
 (`TenantUserRoleGrant` columns `TenantId`, `TenantUserId`, `RoleId`,
-`RevokedAt` joined with `Role.RoleScopeId`), and keep tenant-export moderation
-reads off `PlatformUserRoles` on `Runtime` contexts (including shared
-`ReadTenantInCurrentTransactionAsync` callers). See
+`RevokedAt` joined with `Role.RoleScopeId`). Tenant-export moderation
+definitions are not read on `Runtime` at all: they use the bracketed `Global`
+read described above (including shared `ReadTenantInCurrentTransactionAsync`
+callers). See
 [Read-only authority verification across Runtime and Global](adr/ADR-application-owned-persistence.md#read-only-authority-verification-across-runtime-and-global).
 *(Design standard accepted; single-tenant package export cutover and PostgreSQL
 provider verification remain pending active implementation acceptance.)*

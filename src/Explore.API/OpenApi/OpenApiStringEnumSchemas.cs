@@ -175,6 +175,7 @@ internal static class OpenApiStringEnumSchemaCatalog
         typeof(ConfigurationImportSessionState),
         typeof(ConfigurationPortabilityClass),
         typeof(ConfigurationManifestExportView),
+        typeof(ConfigurationManifestExportScope),
         typeof(DeclineBehavior),
         typeof(EmailDispatchParkReason),
         typeof(EmailDispatchStatus),

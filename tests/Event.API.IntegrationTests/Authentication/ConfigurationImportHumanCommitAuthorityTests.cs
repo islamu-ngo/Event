@@ -325,7 +325,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
             .SingleAsync(row => row.TenantId == fixture.TenantId);
         string desiredName = tenant.FullName + " imported";
         var snapshot = await owner.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>()
-            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, default);
+            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var artifact = JsonNode.Parse(snapshot.Utf8Json.Span)!;
         var selectedTenant = artifact["spec"]!["tenants"]!.AsArray()
             .Single(node => node!["metadata"]!["name"]!.GetValue<string>() == tenant.Slug)!.DeepClone();
@@ -461,7 +461,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
             fixture.Context.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
         await fixture.Context.SaveChangesAsync();
         var executor = fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>();
-        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, default);
+        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var created = await executor.CreateAsync(snapshot.Utf8Json, default);
         var request = new ConfigurationImportPreviewRequest
         {
@@ -543,7 +543,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
         lease.BindHuman(subject, Explore.Persistence.Security.HumanAdministratorCommitPurpose.ConfigurationImport,
             null, fixture.Lifetime);
         var snapshot = await scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>()
-            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, default);
+            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var sessions = scope.ServiceProvider.GetRequiredService<ConfigurationImportSessionApplicationService>();
         var created = await sessions.CreateInstanceAsync(snapshot.Utf8Json, default);
         var request = new ConfigurationImportPreviewRequest
@@ -671,7 +671,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
         lease.BindHuman(subject, Explore.Persistence.Security.HumanAdministratorCommitPurpose.ConfigurationImport,
             null, fixture.Lifetime);
         var snapshot = await scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>()
-            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, default);
+            .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var sessions = scope.ServiceProvider.GetRequiredService<ConfigurationImportSessionApplicationService>();
         var created = await sessions.CreateInstanceAsync(snapshot.Utf8Json, default);
         var request = new ConfigurationImportPreviewRequest
@@ -781,7 +781,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
             fixture.Context.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
         await fixture.Context.SaveChangesAsync();
         var executor = fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>();
-        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, default);
+        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var artifact = JsonNode.Parse(snapshot.Utf8Json.Span)!;
         string originalTheme = await fixture.Context.SystemSettings.AsNoTracking()
             .Where(row => row.SettingKey == AppearanceSettingDefinitions.DefaultThemeMode.Key)
@@ -866,7 +866,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
             fixture.Context.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
         await fixture.Context.SaveChangesAsync();
         var executor = fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>();
-        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, default);
+        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var artifact = JsonNode.Parse(snapshot.Utf8Json.Span)!;
         var settings = artifact["spec"]!["instance"]!["settings"]!;
         settings[EventResourceSettingDefinitions.MaxActiveResources.Key] = 100;
@@ -934,7 +934,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
         lease.BindHuman(subject, Explore.Persistence.Security.HumanAdministratorCommitPurpose.ConfigurationImport,
             null, fixture.Lifetime);
         var reader = owner.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>();
-        var snapshot = await reader.ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, default);
+        var snapshot = await reader.ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var sessions = owner.ServiceProvider.GetRequiredService<ConfigurationImportSessionApplicationService>();
         var created = await sessions.CreateInstanceAsync(snapshot.Utf8Json, default);
         var request = new ConfigurationImportPreviewRequest
@@ -991,7 +991,7 @@ public sealed class ConfigurationImportHumanCommitAuthorityTests
             await Assert.That(await context.ConfigurationImportOperations.AsNoTracking()
                 .CountAsync(row => row.SessionId == created.SessionId)).IsEqualTo(1);
         }
-        var after = await reader.ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, default);
+        var after = await reader.ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
         await Assert.That(ConfigurationImportArtifactSnapshotFactory
             .FromManifest(parser.Parse(after.Utf8Json).Manifest)
             .Single(section => section.SectionKey == "instance.settings").NormalizedDigest)

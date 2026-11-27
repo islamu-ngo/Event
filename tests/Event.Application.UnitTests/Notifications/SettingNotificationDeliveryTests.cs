@@ -261,6 +261,9 @@ public sealed class SettingNotificationDeliveryTests
         public Task<string?> UpsertInCurrentTransactionAsync(SystemSetting setting, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<string?> UpsertLockAsync(SystemSetting setting, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<List<SystemSetting>> GetAllSettings(string? category = null, CancellationToken cancellationToken = default) => Task.FromResult(new List<SystemSetting> { _setting });
+        public Task<IReadOnlyList<SystemSetting>> GetByKeysForConfigurationExportAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task<bool> IsLocked(string key, CancellationToken cancellationToken = default) => Task.FromResult(_setting.IsLocked);
     }
 }

@@ -134,6 +134,18 @@ Do not select ungranted columns such as `TenantUserRoleGrant.Id` or
 ungranted `TenantUserRoleGrants` columns. Reserve `FOR UPDATE` row fences and
 commit-authority locks for mutating workflows.
 
+**Moderation definitions are the one tenant-data exception.** `Runtime` holds no
+grant on any moderation source table (host binding, service principal, policy
+selection, qualification epoch, publication graph), and granting one would require
+an attested installer over roughly sixteen tables on which `Global` already holds
+rights. A tenant package therefore reads its moderation definition on a fresh
+tenantless `Global` context in its own short `Serializable` read-only transaction,
+without row fences, through `IConfigurationManifestPackageModerationReader`. It
+reads it once before and once after the `Runtime` snapshot and rejects the package
+unless both reads return the same source publication ids. Every republish mints a
+new publication id, so equal ids show the definition was unchanged across the
+`Runtime` snapshot.
+
 *Implementation boundary:* `AdministrativeAuthorityQuery` and
 `AdministrativeAuthorityRepository` already implement EF-first `Global`
 authority reads across providers. Adopting this read-only `Global` owner pattern

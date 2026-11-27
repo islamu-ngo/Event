@@ -43,7 +43,7 @@ public sealed class HumanImportSessionOwnershipTests
             fixture.Context.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
         await fixture.Context.SaveChangesAsync();
         var executor = fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>();
-        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, CancellationToken.None);
+        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, CancellationToken.None);
         byte[] artifact = snapshot.Utf8Json.ToArray();
         string originalDigest = ConfigurationImportDigest.ComputeBytes(artifact);
         if (!preview)
@@ -101,7 +101,7 @@ public sealed class HumanImportSessionOwnershipTests
             fixture.Context.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
         await fixture.Context.SaveChangesAsync();
         var executor = fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>();
-        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, CancellationToken.None);
+        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, CancellationToken.None);
         var created = await executor.CreateAsync(snapshot.Utf8Json, CancellationToken.None);
         var before = await MutationCounts.ReadAsync(fixture.Context);
         var preview = await executor.PreviewAsync(created.SessionId, created.AccessToken,

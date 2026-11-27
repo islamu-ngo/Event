@@ -46,17 +46,24 @@ public static class ConfigurationPortabilityJsonCodec
             ConfigurationManifestContractMetadata.SchemaId, ConfigurationManifestContractMetadata.Kind,
             static value =>
             {
+                if (value.Spec.Tenants is null)
+                    value = value with { Spec = value.Spec with { Tenants = [] } };
                 if (value.Spec.Tenants.Count > ConfigurationPortabilityContentLimits.MaximumTenantCount)
                     Fail(ConfigurationPortabilityDiagnosticCodes.CountExceeded, "$.spec.tenants");
                 ConfigurationModerationShape.Validate(value.Spec.Instance.Moderation, "$.spec.instance.moderation");
                 for (int i = 0; i < value.Spec.Tenants.Count; i++)
                     ConfigurationModerationShape.Validate(value.Spec.Tenants[i].Spec.Moderation, $"$.spec.tenants[{i}].spec.moderation");
+                return value;
             });
 
     public static TenantConfigurationPackageV1Alpha2 ParseTenantConfigurationPackage(ReadOnlyMemory<byte> artifact) =>
         Parse(artifact, ConfigurationPortabilityJsonContext.Default.TenantConfigurationPackageV1Alpha2,
             TenantConfigurationPackageContractMetadata.SchemaId, TenantConfigurationPackageContractMetadata.Kind,
-            static value => ConfigurationModerationShape.Validate(value.Spec.Moderation, "$.spec.moderation"));
+            static value =>
+            {
+                ConfigurationModerationShape.Validate(value.Spec.Moderation, "$.spec.moderation");
+                return value;
+            });
 
     public static byte[] SerializeConfigurationManifest(ConfigurationManifestV1Alpha2 manifest)
     {
@@ -73,7 +80,7 @@ public static class ConfigurationPortabilityJsonCodec
     }
 
     private static T Parse<T>(ReadOnlyMemory<byte> artifact, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo,
-        string schema, string kind, Action<T> validate) where T : class
+        string schema, string kind, Func<T, T> validate) where T : class
     {
         if (artifact.IsEmpty)
             Fail(ConfigurationPortabilityDiagnosticCodes.ContractInvalid, "$");
@@ -94,8 +101,7 @@ public static class ConfigurationPortabilityJsonCodec
             RequireString(root, "$schema", "$.$schema", schema);
             RequireString(root, "apiVersion", "$.apiVersion", ConfigurationManifestContractMetadata.ApiVersion);
             RequireString(root, "kind", "$.kind", kind);
-            validate(value);
-            return value;
+            return validate(value);
         }
         catch (ConfigurationPortabilityContractException) { throw; }
         catch (JsonException exception) when (exception.Message.Contains("maximum configured depth", StringComparison.OrdinalIgnoreCase))
@@ -139,6 +145,9 @@ public static class ConfigurationPortabilityJsonCodec
                     Fail(ConfigurationPortabilityDiagnosticCodes.ContractInvalid, childPath);
                 if (ForbiddenMembers.Contains(property.Name))
                     Fail(ConfigurationPortabilityDiagnosticCodes.SensitiveMemberForbidden, childPath);
+                if (path == "$.spec" && property.Name == "tenants"
+                    && property.Value.ValueKind == JsonValueKind.Null)
+                    Fail(ConfigurationPortabilityDiagnosticCodes.ContractInvalid, childPath);
                 if (property.Name == "moderation" && property.Value.ValueKind == JsonValueKind.Null
                     && (path == "$.spec" || path == "$.spec.instance"
                         || path.StartsWith("$.spec.tenants[", StringComparison.Ordinal)
@@ -154,7 +163,11 @@ public static class ConfigurationPortabilityJsonCodec
         {
             int index = 0;
             foreach (JsonElement item in element.EnumerateArray())
+            {
+                if (path == "$.spec.tenants" && item.ValueKind == JsonValueKind.Null)
+                    Fail(ConfigurationPortabilityDiagnosticCodes.ContractInvalid, $"{path}[{index}]");
                 Inspect(item, $"{path}[{index++}]");
+            }
         }
         else if (element.ValueKind == JsonValueKind.String)
         {

@@ -49,7 +49,7 @@ public sealed class ConfigurationImportSnapshotConsistencyTests
             await context.SaveChangesAsync();
             var reader = fixture.Services.GetRequiredService<ConfigurationManifestCurrentStateReader>();
             var snapshot = await reader.ReadImportSnapshotAsync(
-                ConfigurationManifestExportView.Portable, null, default);
+                ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
 
             using JsonDocument artifact = JsonDocument.Parse(snapshot.Utf8Json);
             JsonElement payload = artifact.RootElement.GetProperty("spec").GetProperty("tenants")

@@ -15,7 +15,7 @@ public sealed partial class ModerationPolicyPublicationTests
     [Test]
     public async Task Whole_instance_reservation_applies_instance_request_and_foreign_drafts_with_shared_epoch()
     {
-        await using var database = await Database.CreateAsync(implementedInventory: true);
+        await using var database = await Database.CreateAsync(implementedInventory: true, physicalFile: true);
         var foreign = await PublishExportTenantAsync(database);
         await using var context = database.Context();
         var artifact = await FanoutArtifactAsync(database, context);
@@ -44,8 +44,7 @@ public sealed partial class ModerationPolicyPublicationTests
             return true;
         });
         await using var actual = database.Context();
-        var exported = await CurrentExportReader(database, actual).ReadAsync(
-            ConfigurationManifestExportView.Overrides, CancellationToken.None);
+        var exported = await ReadCombinedManifestAsync(database, actual);
         var manifest = new ConfigurationImportArtifactParser().Parse(exported.Utf8Json).Manifest;
         await Assert.That(manifest.Spec.Instance.Moderation).IsNotNull();
         await Assert.That(manifest.Spec.Tenants.Count(tenant => tenant.Spec.Moderation is not null)).IsEqualTo(2);
@@ -82,7 +81,7 @@ public sealed partial class ModerationPolicyPublicationTests
     [Arguments("missing")]
     public async Task Whole_instance_repreview_rejects_external_reservation_drift(string drift)
     {
-        await using var database = await Database.CreateAsync(implementedInventory: true);
+        await using var database = await Database.CreateAsync(implementedInventory: true, physicalFile: true);
         var foreign = await PublishExportTenantAsync(database);
         await using var context = database.Context();
         var artifact = await FanoutArtifactAsync(database, context);
@@ -148,7 +147,7 @@ public sealed partial class ModerationPolicyPublicationTests
     [Arguments(true)]
     public async Task Fanout_later_failure_or_terminal_authority_loss_rolls_back_earlier_legal_and_drafts(bool terminal)
     {
-        await using var database = await Database.CreateAsync(implementedInventory: true);
+        await using var database = await Database.CreateAsync(implementedInventory: true, physicalFile: true);
         await PublishExportTenantAsync(database);
         ModerationConfigurationImportReservationSet reservation;
         ReadOnlyMemory<byte> artifact;
@@ -191,7 +190,7 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That((await actual.Tenants.SingleAsync(row => row.Id == database.TenantId)).FullName).IsEqualTo(originalName);
         await Assert.That(await new LegalDocumentRepository(actual).GetByIdForUpdateAsync(
             legal.Id, LegalDocumentScope.Tenant, database.TenantId, CancellationToken.None)).IsNull();
-        var exported = await Exporter(database, actual).ReadAsync(ConfigurationImportTarget.ForInstance(), CancellationToken.None);
+        var exported = await ReadCombinedDefinitionsAsync(database, actual);
         await Assert.That(exported.Instance).IsNull();
         await Assert.That(exported.Tenants.Count).IsEqualTo(1);
     }
@@ -199,7 +198,7 @@ public sealed partial class ModerationPolicyPublicationTests
     [Test]
     public async Task Unreserved_native_epoch_advance_in_same_transaction_is_not_owned_fanout_progress()
     {
-        await using var database = await Database.CreateAsync(implementedInventory: true);
+        await using var database = await Database.CreateAsync(implementedInventory: true, physicalFile: true);
         await PublishExportTenantAsync(database);
         await using var context = database.Context();
         var artifact = await FanoutArtifactAsync(database, context);
@@ -219,7 +218,7 @@ public sealed partial class ModerationPolicyPublicationTests
             return true;
         })).Throws<ModerationConfigurationImportException>();
         await using var reader = database.Context();
-        var actual = await Exporter(database, reader).ReadAsync(ConfigurationImportTarget.ForInstance(), CancellationToken.None);
+        var actual = await ReadCombinedDefinitionsAsync(database, reader);
         await Assert.That(actual.Instance).IsNull();
         await Assert.That(actual.Tenants.Count).IsEqualTo(1);
     }
@@ -236,8 +235,7 @@ public sealed partial class ModerationPolicyPublicationTests
     private static async Task<ReadOnlyMemory<byte>> FanoutArtifactAsync(Database database, ExploreDbContext context)
     {
         await SeedExportPaidPolicyAsync(context);
-        var exported = await CurrentExportReader(database, context).ReadAsync(
-            ConfigurationManifestExportView.Overrides, CancellationToken.None);
+        var exported = await ReadCombinedManifestAsync(database, context);
         var manifest = new ConfigurationImportArtifactParser().Parse(exported.Utf8Json).Manifest;
         var document = ModerationConfigurationImportSections.ToWire(ImportDocument(database));
         manifest = manifest with

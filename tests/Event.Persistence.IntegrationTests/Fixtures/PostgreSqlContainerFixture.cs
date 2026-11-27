@@ -252,13 +252,18 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             await PostgresConfigurationImportSnapshotContract.ApplyAsync(migratorContext);
             await PostgresConfigurationImportStateContract.ApplyAsync(migratorContext);
             await PostgresConfigurationImportLegalSourceContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportLegalSourceContract.ApplyConfigurationReadPermissionsAsync(
+                migratorContext, NativeQueueEnrollment);
             await PostgresConfigurationImportLegalMutationContract.ApplyAsync(migratorContext);
             await PostgresConfigurationImportPublicationPolicyContract.ApplyAsync(migratorContext);
             await PostgresConfigurationImportScalarSettingContract.ApplyAsync(migratorContext);
             await PostgresConfigurationImportReceiptContract.ApplyAsync(migratorContext);
             await PostgresConfigurationImportPaidPolicyContract.ApplyAsync(migratorContext);
+            await PostgresConfigurationImportPaidPolicyContract.ApplyConfigurationReadPermissionsAsync(
+                migratorContext, NativeQueueEnrollment);
             await PostgresConfigurationImportTenantIdentityContract.ApplyAsync(migratorContext);
             await PostgresConfigurationImportBrandingContract.ApplyAsync(migratorContext);
+            await PostgresTenantBrandingReadContract.ApplyAsync(migratorContext, NativeQueueEnrollment);
             await PostgresConfigurationImportEventResourceContract.ApplyAsync(migratorContext);
             // Enrollment is separate from installation: exercise the actual restricted
             // Global capability, not an unrelated missing-role denial.

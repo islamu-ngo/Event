@@ -35,7 +35,7 @@ public sealed class ConfigurationManifestContractTests
     }
 
     [Test]
-    public async Task RootContract_RequiresClosedInstanceAndTenantScopes()
+    public async Task RootContract_RequiresClosedInstanceWithOptionalTenantScopes()
     {
         Type? rootType = ContractAssembly.GetType(
             ContractNamespace + "ConfigurationManifestV1Alpha2");
@@ -50,7 +50,7 @@ public sealed class ConfigurationManifestContractTests
             "Spec");
 
         Type specType = RequiredProperty(rootType, "Spec").PropertyType;
-        await AssertClosedRequiredProperties(specType, "Instance", "Tenants");
+        await AssertClosedProperties(specType, ["Instance"], [], ["Tenants"]);
 
         Type instanceType = RequiredProperty(specType, "Instance").PropertyType;
         await AssertClosedProperties(instanceType,
@@ -166,8 +166,10 @@ public sealed class ConfigurationManifestContractTests
         => await AssertClosedProperties(type, expectedNames, []);
 
     private static async Task AssertClosedProperties(
-        Type type, string[] requiredNames, string[] optionalNames)
+        Type type, string[] requiredNames, string[] optionalNames, string[]? defaultedNames = null)
     {
+        // Defaulted members may be omitted on the wire but are never null in memory.
+        defaultedNames ??= [];
         JsonUnmappedMemberHandlingAttribute? unmapped =
             type.GetCustomAttribute<JsonUnmappedMemberHandlingAttribute>();
         await Assert.That(unmapped).IsNotNull();
@@ -179,14 +181,14 @@ public sealed class ConfigurationManifestContractTests
             .Select(property => property.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        string[] orderedExpected = requiredNames.Concat(optionalNames)
+        string[] orderedExpected = requiredNames.Concat(optionalNames).Concat(defaultedNames)
             .Order(StringComparer.Ordinal)
             .ToArray();
         await Assert.That(actualNames.SequenceEqual(
             orderedExpected,
             StringComparer.Ordinal)).IsTrue();
 
-        foreach (string name in requiredNames.Concat(optionalNames))
+        foreach (string name in requiredNames.Concat(optionalNames).Concat(defaultedNames))
         {
             PropertyInfo property = RequiredProperty(type, name);
             bool isRequired =
@@ -196,6 +198,9 @@ public sealed class ConfigurationManifestContractTests
             if (optionalNames.Contains(name, StringComparer.Ordinal))
                 await Assert.That(new NullabilityInfoContext().Create(property).ReadState)
                     .IsEqualTo(NullabilityState.Nullable);
+            if (defaultedNames.Contains(name, StringComparer.Ordinal))
+                await Assert.That(new NullabilityInfoContext().Create(property).ReadState)
+                    .IsEqualTo(NullabilityState.NotNull);
         }
     }
 

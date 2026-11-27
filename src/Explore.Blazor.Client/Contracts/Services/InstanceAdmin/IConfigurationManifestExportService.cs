@@ -9,5 +9,6 @@ public interface IConfigurationManifestExportService
 
     Task<ConfigurationManifestDownloadResult> DownloadAsync(
         ConfigurationManifestExportView view,
+        ConfigurationManifestExportScope scope,
         CancellationToken cancellationToken = default);
 }

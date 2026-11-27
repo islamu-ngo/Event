@@ -12,11 +12,14 @@ namespace Event.Persistence.IntegrationTests.Moderation;
 public sealed partial class ModerationPolicyPublicationTests
 {
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task Whole_instance_session_reloads_complete_reservation_verifies_artifact_and_retains_neutral_snapshot(bool mapped)
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    [Arguments(true, true)]
+    public async Task Whole_instance_session_reloads_complete_reservation_verifies_artifact_and_retains_neutral_snapshot(
+        bool mapped, bool tenantModerationOnly)
     {
-        await using var database = await Database.CreateAsync(implementedInventory: true);
+        await using var database = await Database.CreateAsync(implementedInventory: true, physicalFile: true);
         await database.PublishAsync(database.Request());
         var foreign = await PublishExportTenantAsync(database);
         var protection = new EphemeralDataProtectionProvider();
@@ -25,7 +28,9 @@ public sealed partial class ModerationPolicyPublicationTests
         ConfigurationManifestV1Alpha2 original;
         var request = new ConfigurationImportPreviewRequest
         {
-            SelectedSectionKeys = mapped
+            SelectedSectionKeys = tenantModerationOnly
+                ? [ModerationConfigurationImportSections.Tenant]
+                : mapped
                 ? [ModerationConfigurationImportSections.Instance, ModerationConfigurationImportSections.Tenant]
                 : [ModerationConfigurationImportSections.Instance, ModerationConfigurationImportSections.Tenant, "tenant.legal_documents"],
             Mappings = mapped ? new Dictionary<string, string> { ["source-alias"] = $"tenant:export-{foreign.TenantId:N}" }
@@ -35,12 +40,12 @@ public sealed partial class ModerationPolicyPublicationTests
         };
         await using (var context = database.Context())
         {
-            context.LegalDocuments.AddRange(LegalImportDraft(database.TenantId), LegalImportDraft(foreign.TenantId));
+            context.LegalDocuments.Add(LegalImportDraft(database.TenantId));
             await context.SaveChangesAsync();
+            await SeedForeignLegalDraftAsync(context, foreign.TenantId);
             await SeedExportPaidPolicyAsync(context);
-            var reader = CurrentExportReader(database, context);
-            original = new ConfigurationImportArtifactParser().Parse((await reader.ReadAsync(
-                ConfigurationManifestExportView.Overrides, CancellationToken.None)).Utf8Json).Manifest;
+            original = new ConfigurationImportArtifactParser().Parse(
+                (await ReadCombinedManifestAsync(database, context)).Utf8Json).Manifest;
             var source = new ConfigurationImportArtifactParser().Parse(await FanoutArtifactAsync(database, context)).Manifest;
             source = source with
             {
@@ -84,7 +89,8 @@ public sealed partial class ModerationPolicyPublicationTests
         await Assert.That(receipt.EffectStatus).IsEqualTo(ConfigurationImportEffectStatus.Completed);
         await Assert.That(receipt.SnapshotAvailable).IsTrue();
         var actual = new ConfigurationImportArtifactParser().Parse((await apply.ReadSnapshotAsync(
-            ConfigurationManifestExportView.Overrides, CancellationToken.None)).Utf8Json).Manifest;
+            ConfigurationManifestExportView.Overrides, ConfigurationManifestExportScope.InstanceAndTenants,
+            CancellationToken.None)).Utf8Json).Manifest;
         foreach (var tenant in actual.Spec.Tenants)
             await Assert.That(tenant.Spec.Moderation!.Classes.Single().Meaning).IsEqualTo("Imported complete meaning.");
         var operation = await new ConfigurationImportOperationRepository(applyContext).GetByIdAsync(
@@ -92,6 +98,9 @@ public sealed partial class ModerationPolicyPublicationTests
         var snapshot = await new ConfigurationImportArtifactRepository(applyContext, protection).ReadAsync(
             new(operation!.SnapshotArtifactHandleId!.Value), CancellationToken.None);
         var rollback = new ConfigurationImportArtifactParser().Parse(snapshot).Manifest;
+        await Assert.That(rollback.Metadata.Export!.AuthorityScope)
+            .IsEqualTo(ConfigurationManifestExportMetadataValues.InstanceAndTenantsAuthorityScope);
+        await Assert.That(rollback.Spec.Tenants.Count).IsEqualTo(original.Spec.Tenants.Count);
         await Assert.That(rollback.Spec.Instance.Moderation).IsNull();
         foreach (var tenant in original.Spec.Tenants)
         {

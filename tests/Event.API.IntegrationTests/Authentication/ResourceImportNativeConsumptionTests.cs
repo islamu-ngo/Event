@@ -264,7 +264,7 @@ public sealed class ResourceImportNativeConsumptionTests(PostgreSqlContainerFixt
     private static async Task<PreparedImport> PrepareAsync(IConfigurationInstanceImportExecutor executor, Guid tenant)
     {
         // This scenario imports one stored override, not a replacement for flattened defaults.
-        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, default);
+        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var manifest = JsonNode.Parse(snapshot.Utf8Json.Span)!;
         var tenants = manifest["spec"]!["tenants"]!.AsArray();
         foreach (var source in tenants)

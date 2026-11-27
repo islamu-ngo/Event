@@ -110,6 +110,7 @@ public static class BffConfigurationManifestEndpoints
 
     private static async Task<IResult> HandleDownloadAsync(
         ConfigurationManifestExportView? view,
+        ConfigurationManifestExportScope? scope,
         HttpContext context,
         IInstanceAdminClient controlPlaneClient,
         IInstance_ConfigurationClient controlPlaneConfigurationClient,
@@ -121,7 +122,12 @@ public static class BffConfigurationManifestEndpoints
 
         ConfigurationManifestExportView requestedView =
             view ?? ConfigurationManifestExportView.Overrides;
-        string relation = RelationFor(requestedView);
+        ConfigurationManifestExportScope requestedScope =
+            scope ?? ConfigurationManifestExportScope.Instance;
+        if (!Enum.IsDefined(requestedView) || !Enum.IsDefined(requestedScope))
+            return Results.BadRequest();
+
+        string relation = InstanceAdminHal.ExportConfigurationRelation(requestedView, requestedScope);
         string expectedFileName = FileNameFor(requestedView);
         var logger = loggerFactory.CreateLogger("ConfigurationManifestExport");
 
@@ -141,6 +147,7 @@ public static class BffConfigurationManifestEndpoints
             using FileResponse response =
                 await controlPlaneConfigurationClient.ExportConfigurationManifestAsync(
                     requestedView,
+                    scope: requestedScope,
                     cancellationToken: cancellationToken);
 
             if (!HasExpectedContentType(response.Headers)
@@ -200,16 +207,6 @@ public static class BffConfigurationManifestEndpoints
         string relation) =>
         links?.TryGetValue(relation, out HalLink? link) == true
         && string.Equals(link.Method, HttpMethods.Get, StringComparison.OrdinalIgnoreCase);
-
-    private static string RelationFor(ConfigurationManifestExportView view) =>
-        view switch
-        {
-            ConfigurationManifestExportView.Overrides =>
-                InstanceAdminLinkRelations.ExportConfigurationOverrides,
-            ConfigurationManifestExportView.Portable =>
-                InstanceAdminLinkRelations.ExportConfigurationPortable,
-            _ => throw new ArgumentOutOfRangeException(nameof(view), view, "Unsupported export view.")
-        };
 
     private static string FileNameFor(ConfigurationManifestExportView view) =>
         view switch

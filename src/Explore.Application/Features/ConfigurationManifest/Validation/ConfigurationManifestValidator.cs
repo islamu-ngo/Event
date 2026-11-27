@@ -236,6 +236,13 @@ public static class ConfigurationManifestValidator
         if (export is null)
             return;
 
+        bool validAuthorityScope = export.AuthorityScope switch
+        {
+            ConfigurationManifestExportMetadataValues.InstanceAuthorityScope =>
+                manifest.Spec?.Tenants is not { Count: > 0 },
+            ConfigurationManifestExportMetadataValues.InstanceAndTenantsAuthorityScope => true,
+            _ => false
+        };
         bool isOverrides = string.Equals(
             export.View,
             ConfigurationManifestExportMetadataValues.OverridesView,
@@ -247,11 +254,7 @@ public static class ConfigurationManifestValidator
         if ((!isOverrides && !isPortable)
             || export.EffectiveValuesFlattened != isPortable
             || !export.SensitiveValuesOmitted
-            || !string.Equals(
-                    export.AuthorityScope,
-                    ConfigurationManifestExportMetadataValues
-                        .InstanceAndTenantsAuthorityScope,
-                    StringComparison.Ordinal)
+            || !validAuthorityScope
             || !export.SovereignValuesOmitted
             || export.SovereignLockedFields is null
             || !export.SovereignLockedFields.SequenceEqual(
@@ -309,7 +312,7 @@ public static class ConfigurationManifestValidator
         ConfigurationManifestPaidEventPolicyPayloadV1Alpha2? proposedInstancePolicy,
         List<ConfigurationManifestValidationError> errors)
     {
-        if (tenants.Count is < 1 or > MaximumTenantCount)
+        if (tenants.Count > MaximumTenantCount)
         {
             AddContractError(errors, "$.spec.tenants");
             return;

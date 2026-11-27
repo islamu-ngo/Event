@@ -10,9 +10,16 @@ public enum ConfigurationManifestExportView
     Portable = 1
 }
 
+public enum ConfigurationManifestExportScope
+{
+    Instance = 0,
+    InstanceAndTenants = 1
+}
+
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
 public sealed record ExportConfigurationManifestQuery(
-    ConfigurationManifestExportView View = ConfigurationManifestExportView.Overrides)
+    ConfigurationManifestExportView View = ConfigurationManifestExportView.Overrides,
+    ConfigurationManifestExportScope Scope = ConfigurationManifestExportScope.Instance)
     : IQuery<ConfigurationManifestExportResult>, ISecureRequest
 {
     public const string ResourceKey = "instance.configuration-manifest.export";
@@ -26,6 +33,7 @@ public sealed record ExportConfigurationManifestQuery(
 public sealed record ConfigurationManifestExportResult
 {
     public required ConfigurationManifestExportView View { get; init; }
+    public required ConfigurationManifestExportScope Scope { get; init; }
 
     public required string FileName { get; init; }
 
@@ -56,5 +64,6 @@ public sealed class ExportConfigurationManifestQueryValidator
     public ExportConfigurationManifestQueryValidator()
     {
         RuleFor(request => request.View).IsInEnum();
+        RuleFor(request => request.Scope).IsInEnum();
     }
 }

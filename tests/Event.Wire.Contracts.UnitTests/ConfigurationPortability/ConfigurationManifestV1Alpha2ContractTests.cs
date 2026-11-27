@@ -3,6 +3,8 @@ namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
@@ -10,6 +12,87 @@ public sealed class ConfigurationManifestV1Alpha2ContractTests
 {
     private const string ContractNamespace =
         "ISLAMU.Wire.Contracts.ConfigurationPortability.";
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task OmittedTenantsNormalizeToAnExplicitEmptyDeclaration(bool productionContext)
+    {
+        JsonNode artifact = JsonNode.Parse(ConfigurationPortabilityExpectedVectors.ManifestJson)!;
+        artifact["spec"]!.AsObject().Remove("tenants");
+
+        byte[] bytes = Encoding.UTF8.GetBytes(artifact.ToJsonString());
+        var manifest = productionContext
+            ? JsonSerializer.Deserialize(bytes,
+                ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2)!
+            : ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(bytes);
+
+        await Assert.That(manifest.Spec.Tenants).IsEmpty();
+        using JsonDocument normalized = JsonDocument.Parse(productionContext
+            ? JsonSerializer.SerializeToUtf8Bytes(manifest,
+                ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2)
+            : ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(manifest));
+        await Assert.That(normalized.RootElement.GetProperty("spec")
+            .GetProperty("tenants").GetArrayLength()).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task EmptyTenantsRemainEmptyAcrossPortableRoundTrip(bool productionContext)
+    {
+        JsonNode artifact = JsonNode.Parse(ConfigurationPortabilityExpectedVectors.ManifestJson)!;
+        artifact["spec"]!["tenants"] = new JsonArray();
+
+        byte[] bytes = Encoding.UTF8.GetBytes(artifact.ToJsonString());
+        var manifest = productionContext
+            ? JsonSerializer.Deserialize(bytes,
+                ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2)!
+            : ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(bytes);
+        var restored = productionContext
+            ? JsonSerializer.Deserialize(
+                JsonSerializer.SerializeToUtf8Bytes(manifest,
+                    ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2),
+                ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2)!
+            : ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+                ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(manifest));
+
+        await Assert.That(restored.Spec.Tenants).IsEmpty();
+        await Assert.That(restored.Spec.Instance.Settings["events.require_approval"].GetBoolean()).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExplicitNullTenantsFailWithAContractDiagnostic(bool productionContext)
+    {
+        JsonNode artifact = JsonNode.Parse(ConfigurationPortabilityExpectedVectors.ManifestJson)!;
+        artifact["spec"]!["tenants"] = null;
+
+        if (productionContext)
+        {
+            await Assert.That(() => JsonSerializer.Deserialize(
+                    Encoding.UTF8.GetBytes(artifact.ToJsonString()),
+                    ConfigurationPortabilityJsonContext.Default.ConfigurationManifestV1Alpha2))
+                .Throws<JsonException>();
+            return;
+        }
+
+        await Assert.That(() => ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+                Encoding.UTF8.GetBytes(artifact.ToJsonString())))
+            .Throws<ConfigurationPortabilityContractException>();
+    }
+
+    [Test]
+    public async Task NullTenantEntryFailsWithAContractDiagnostic()
+    {
+        JsonNode artifact = JsonNode.Parse(ConfigurationPortabilityExpectedVectors.ManifestJson)!;
+        artifact["spec"]!["tenants"] = new JsonArray((JsonNode?)null);
+
+        await Assert.That(() => ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+                Encoding.UTF8.GetBytes(artifact.ToJsonString())))
+            .Throws<ConfigurationPortabilityContractException>();
+    }
 
     [Test]
     public async Task ContractMetadata_UsesDistinctV1Alpha2ArtifactIdentities()

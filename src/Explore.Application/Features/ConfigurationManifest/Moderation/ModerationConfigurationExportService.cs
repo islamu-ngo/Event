@@ -1,6 +1,8 @@
 using System.Collections.Frozen;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
+using Explore.Domain;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 namespace Explore.Application.Features.ConfigurationManifest.Moderation;
@@ -13,14 +15,46 @@ public sealed class ModerationConfigurationExportService(
     IModerationPolicyPublicationRepository publications, IUnitOfWork unitOfWork)
 {
     public Task<ModerationConfigurationExport> ReadAsync(
-        ConfigurationImportTarget target, CancellationToken cancellationToken) =>
+        ConfigurationImportTarget target, ConfigurationManifestExportScope? instanceScope,
+        CancellationToken cancellationToken) =>
         unitOfWork.ExecuteSerializableAsync(
-            token => ReadInCurrentTransactionAsync(target, token), cancellationToken);
+            token => ReadInCurrentTransactionAsync(target, instanceScope, token), cancellationToken);
+
+    public async Task<ModerationConfigurationExport> ReadPublicManifestInCurrentTransactionAsync(
+        ConfigurationManifestExportScope scope, CancellationToken cancellationToken)
+    {
+        var selected = await publications.AcquirePublicManifestExportAsync(scope, cancellationToken);
+        return Project(selected, scope, null);
+    }
 
     public async Task<ModerationConfigurationExport> ReadInCurrentTransactionAsync(
-        ConfigurationImportTarget target, CancellationToken cancellationToken)
+        ConfigurationImportTarget target, ConfigurationManifestExportScope? instanceScope,
+        CancellationToken cancellationToken)
     {
-        var selected = await publications.AcquireConfigurationExportAsync(target, cancellationToken);
+        var selected = await publications.AcquireConfigurationExportAsync(target, instanceScope, cancellationToken);
+        return Project(selected, instanceScope, target.TenantId);
+    }
+
+    /// <summary>
+    /// Reads one tenant's adopted definition under its own serializable transaction on the caller's
+    /// tenantless Global context. Package authority is the caller's responsibility.
+    /// </summary>
+    public Task<ModerationConfigurationExport> ReadTenantPackageAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteSerializableAsync(token => ReadTenantPackageInCurrentTransactionAsync(tenantId, token),
+            cancellationToken);
+
+    /// <summary>
+    /// Reads one tenant's adopted definition inside the caller's read snapshot on a tenantless Global
+    /// context; used where the provider snapshot must not take the database write lock.
+    /// </summary>
+    public async Task<ModerationConfigurationExport> ReadTenantPackageInCurrentTransactionAsync(
+        Guid tenantId, CancellationToken cancellationToken) =>
+        Project(await publications.AcquireTenantPackageExportAsync(tenantId, cancellationToken), null, tenantId);
+
+    private static ModerationConfigurationExport Project(
+        IReadOnlyList<ModerationPolicyPublication> selected, ConfigurationManifestExportScope? instanceScope,
+        Guid? tenantTarget)
+    {
         ConfigurationModerationDocumentV1? instance = null;
         var tenants = new Dictionary<Guid, ConfigurationModerationDocumentV1>();
         foreach (var publication in selected)
@@ -31,18 +65,19 @@ public sealed class ModerationConfigurationExportService(
                 ModerationConfigurationDocumentProjection.FromCompiledDraft(draft));
             if (publication.JurisdictionTenantId is { } tenantId)
             {
-                if (target.Scope == ConfigurationImportScope.Tenant && target.TenantId != tenantId
+                if ((instanceScope != ConfigurationManifestExportScope.InstanceAndTenants && tenantTarget != tenantId)
                     || !tenants.TryAdd(tenantId, document))
                     throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unavailable);
             }
             else
             {
-                if (target.Scope != ConfigurationImportScope.Instance || instance is not null)
+                if (instanceScope is null || instance is not null)
                     throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unavailable);
                 instance = document;
             }
         }
-        return new ModerationConfigurationExport(instance, tenants);
+        return new ModerationConfigurationExport(instance, tenants,
+            selected.Select(publication => publication.Id).Order().ToArray());
     }
 }
 
@@ -50,12 +85,20 @@ public sealed record ModerationConfigurationExport
 {
     public ModerationConfigurationExport(
         ConfigurationModerationDocumentV1? instance,
-        IReadOnlyDictionary<Guid, ConfigurationModerationDocumentV1> tenants)
+        IReadOnlyDictionary<Guid, ConfigurationModerationDocumentV1> tenants,
+        IReadOnlyList<Guid> publicationIds)
     {
         Instance = instance;
         Tenants = tenants.ToFrozenDictionary();
+        PublicationIds = publicationIds.ToArray();
     }
 
     public ConfigurationModerationDocumentV1? Instance { get; }
     public IReadOnlyDictionary<Guid, ConfigurationModerationDocumentV1> Tenants { get; }
+
+    /// <summary>
+    /// Ordered source publication ids. Every republish creates a new id, so equal ids across two reads
+    /// prove the exported definitions did not change between them.
+    /// </summary>
+    public IReadOnlyList<Guid> PublicationIds { get; }
 }

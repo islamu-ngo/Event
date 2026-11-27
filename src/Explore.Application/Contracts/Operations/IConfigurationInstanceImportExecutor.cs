@@ -13,7 +13,8 @@ public interface IConfigurationInstanceImportExecutor
     Task CancelAsync(Guid sessionId, string accessToken, CancellationToken cancellationToken);
 
     Task<ConfigurationManifestExportResult> ReadSnapshotAsync(
-        ConfigurationManifestExportView view, CancellationToken cancellationToken);
+        ConfigurationManifestExportView view, ConfigurationManifestExportScope snapshotScope,
+        CancellationToken cancellationToken);
 
     Task<ConfigurationImportPreviewResult> PreviewAsync(
         Guid sessionId, string accessToken, ConfigurationImportPreviewRequest request,

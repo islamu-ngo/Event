@@ -31,6 +31,38 @@
       "$ref": "#/$defs/manifestSpec"
     }
   },
+  "if": {
+    "properties": {
+      "metadata": {
+        "required": [
+          "export"
+        ],
+        "properties": {
+          "export": {
+            "required": [
+              "authorityScope"
+            ],
+            "properties": {
+              "authorityScope": {
+                "const": "Instance"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "spec": {
+        "properties": {
+          "tenants": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  },
   "$defs": {
     "brandingPayload": {
       "type": "object",
@@ -1487,7 +1519,10 @@
       ],
       "properties": {
         "authorityScope": {
-          "const": "InstanceAndTenants"
+          "enum": [
+            "Instance",
+            "InstanceAndTenants"
+          ]
         },
         "effectiveValuesFlattened": {
           "type": "boolean"
@@ -1576,8 +1611,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "instance",
-        "tenants"
+        "instance"
       ],
       "properties": {
         "instance": {
@@ -1585,7 +1619,6 @@
         },
         "tenants": {
           "type": "array",
-          "minItems": 1,
           "maxItems": 256,
           "items": {
             "$ref": "#/$defs/manifestTenant"

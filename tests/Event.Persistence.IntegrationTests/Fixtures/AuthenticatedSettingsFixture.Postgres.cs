@@ -22,10 +22,11 @@ internal sealed partial class AuthenticatedSettingsFixture
         IInterceptor? interceptor = null, Action<SanitizedRequestFailure>? requestFailureObserver = null,
         Action<Dictionary<string, string?>>? configure = null,
         Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null,
-        DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
+        DeploymentMode deploymentMode = DeploymentMode.SingleTenant,
+        bool createDefaultTenant = true)
     {
         return CreateCoreAsync(createDatabase, interceptor, postgres is null ? null : ConfigureAsync,
-            requestFailureObserver, configure, configureServices, deploymentMode);
+            requestFailureObserver, configure, configureServices, deploymentMode, createDefaultTenant);
 
         async Task ConfigureAsync(ExploreDbContext seed, Dictionary<string, string?> configuration)
         {

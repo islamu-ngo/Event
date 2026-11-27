@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Domain;
 
@@ -20,6 +21,31 @@ public sealed class ConfigurationManifestExportQueryTests
     // Explore.Application type so they resolve against the assembly that actually declares them.
     private static readonly Assembly ApplicationAssembly =
         typeof(AuthorizeResourceAttribute).Assembly;
+
+    [Test]
+    public async Task QueryDefaultsToInstanceScopeIndependentlyOfExportView()
+    {
+        foreach (ConfigurationManifestExportView view in Enum.GetValues<ConfigurationManifestExportView>())
+        {
+            var request = new ExportConfigurationManifestQuery(view);
+            await Assert.That(request.Scope).IsEqualTo(ConfigurationManifestExportScope.Instance);
+            await Assert.That(request.View).IsEqualTo(view);
+        }
+    }
+
+    [Test]
+    [Arguments(-1)]
+    [Arguments(99)]
+    public async Task QueryRejectsUnsupportedExportScope(int scope)
+    {
+        var request = new ExportConfigurationManifestQuery(
+            Scope: (ConfigurationManifestExportScope)scope);
+
+        var validation = new ExportConfigurationManifestQueryValidator().Validate(request);
+
+        await Assert.That(validation.IsValid).IsFalse();
+        await Assert.That(validation.Errors.Select(error => error.PropertyName)).Contains(nameof(request.Scope));
+    }
 
     [Test]
     public async Task Query_UsesCurrentInstanceSettingsViewAndExplicitExportFacts()
@@ -38,11 +64,9 @@ public sealed class ConfigurationManifestExportQueryTests
             .IsFalse()
             .Because("trusted server context, not the caller, selects the current instance");
 
-        object overrides = Enum.Parse(
-            constructor.GetParameters().Single().ParameterType,
-            "Overrides",
-            ignoreCase: false);
-        var request = (ISecureRequest)constructor.Invoke([overrides]);
+        ISecureRequest request = new ExportConfigurationManifestQuery(
+            ConfigurationManifestExportView.Overrides,
+            ConfigurationManifestExportScope.Instance);
         await Assert.That(request.ResourceId).IsEqualTo("instance.configuration-manifest.export");
         await Assert.That(request.AuthorizationFacts).IsNotNull();
         await Assert.That(request.AuthorizationFacts!.GetType().Name)

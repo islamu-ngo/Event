@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Compilation;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
@@ -16,6 +18,36 @@ public sealed class ConfigurationManifestCompilerTests
 {
     private static readonly Guid OperationId = Guid.Parse("0198e2a4-5340-7f89-8abc-b8bdf43e0ea1");
     private static readonly DateTime OccurredAt = new(2026, 8, 25, 12, 0, 0, DateTimeKind.Utc);
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task Compile_OmittedOrEmptyTenants_ProducesInstanceWritesWithoutTenantPlans(
+        bool omitTenants)
+    {
+        const string settingKey = "appearance.default_theme_mode";
+        ConfigurationManifestV1Alpha2 fixture = ConfigurationManifestTestData.Valid(
+            instanceSettings: new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+            {
+                [settingKey] = ConfigurationManifestTestData.Json("\"system\"")
+            });
+        JsonObject artifact = JsonNode.Parse(
+            ConfigurationPortabilityJsonCodec.SerializeConfigurationManifest(fixture))!.AsObject();
+        JsonObject spec = artifact["spec"]!.AsObject();
+        if (omitTenants)
+            spec.Remove("tenants");
+        else
+            spec["tenants"] = new JsonArray();
+
+        ConfigurationManifestV1Alpha2 decoded = ConfigurationPortabilityJsonCodec
+            .ParseConfigurationManifest(Encoding.UTF8.GetBytes(artifact.ToJsonString()));
+        ConfigurationManifestApplyPlan plan = ConfigurationManifestCompiler.Compile(
+            ReadResult(decoded), OperationId, OccurredAt);
+
+        await Assert.That(plan.Tenants).IsEmpty();
+        await Assert.That(plan.Instance.GuardedSettings.Concat(plan.Instance.UnguardedSettings).ToArray())
+            .IsEquivalentTo([new ConfigurationManifestSettingWrite(settingKey, "\"system\"")]);
+    }
 
     [Test]
     public async Task Compile_SortsTenantsAndSplitsGuardedSettings()

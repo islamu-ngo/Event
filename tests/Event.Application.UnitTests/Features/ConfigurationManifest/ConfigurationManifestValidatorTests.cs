@@ -60,6 +60,99 @@ public sealed class ConfigurationManifestValidatorTests
     }
 
     [Test]
+    public async Task Validate_ManifestWithoutTenants_IsValid()
+    {
+        ConfigurationManifestV1Alpha2 valid = ConfigurationManifestTestData.Valid();
+        ConfigurationManifestV1Alpha2 manifest = valid with
+        {
+            Spec = valid.Spec with { Tenants = [] }
+        };
+
+        ConfigurationManifestValidationResult result = ConfigurationManifestValidator.Validate(manifest);
+
+        await Assert.That(result.IsValid).IsTrue();
+        await Assert.That(result.Errors).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("Instance", false, true)]
+    [Arguments("Instance", true, false)]
+    [Arguments("InstanceAndTenants", false, true)]
+    [Arguments("InstanceAndTenants", true, true)]
+    [Arguments("Tenant", true, false)]
+    public async Task Validate_ExportAuthority_RespectsManifestTenantExtent(
+        string authorityScope, bool hasTenant, bool expectedValid)
+    {
+        ConfigurationManifestV1Alpha2 valid = ConfigurationManifestTestData.Valid();
+        ConfigurationManifestV1Alpha2 manifest = valid with
+        {
+            Metadata = valid.Metadata with
+            {
+                Export = new ConfigurationManifestExportMetadataV1Alpha2
+                {
+                    View = ConfigurationManifestExportMetadataValues.OverridesView,
+                    EffectiveValuesFlattened = false,
+                    SensitiveValuesOmitted = true,
+                    AuthorityScope = authorityScope,
+                    SovereignValuesOmitted = true,
+                    SovereignLockedFields = PaidEventPolicyAuthorityMetadata.SovereignLockedFields
+                }
+            },
+            Spec = valid.Spec with { Tenants = hasTenant ? valid.Spec.Tenants : [] }
+        };
+
+        ConfigurationManifestValidationResult result = ConfigurationManifestValidator.Validate(manifest);
+
+        await Assert.That(result.IsValid).IsEqualTo(expectedValid);
+        if (!expectedValid)
+        {
+            await Assert.That(HasCode(result, ConfigurationManifestFailureCodes.ContractInvalid))
+                .IsTrue();
+        }
+    }
+
+    [Test]
+    public async Task Validate_NullTenantList_IsNotAnEmptyDeclaration()
+    {
+        ConfigurationManifestV1Alpha2 valid = ConfigurationManifestTestData.Valid();
+        ConfigurationManifestV1Alpha2 manifest = valid with
+        {
+            Spec = valid.Spec with { Tenants = null! }
+        };
+
+        ConfigurationManifestValidationResult result = ConfigurationManifestValidator.Validate(manifest);
+
+        await Assert.That(result.Errors.Any(error =>
+            error.Code == ConfigurationManifestFailureCodes.ContractInvalid
+            && error.Path == "$.spec.tenants")).IsTrue();
+    }
+
+    [Test]
+    [Arguments(null, "$.spec.tenants[0]")]
+    [Arguments("Invalid Tenant", "$.spec.tenants[0].metadata.name")]
+    public async Task Validate_NullOrMalformedTenantEntry_RejectsAtEntryPath(
+        string? tenantSlug, string expectedPath)
+    {
+        ConfigurationManifestV1Alpha2 valid = ConfigurationManifestTestData.Valid();
+        ConfigurationManifestTenantV1Alpha2 tenant = valid.Spec.Tenants[0];
+        ConfigurationManifestV1Alpha2 manifest = valid with
+        {
+            Spec = valid.Spec with
+            {
+                Tenants = [tenantSlug is null
+                    ? null!
+                    : tenant with { Metadata = tenant.Metadata with { Name = tenantSlug } }]
+            }
+        };
+
+        ConfigurationManifestValidationResult result = ConfigurationManifestValidator.Validate(manifest);
+
+        await Assert.That(result.Errors.Any(error =>
+            error.Code == ConfigurationManifestFailureCodes.ContractInvalid
+            && error.Path == expectedPath)).IsTrue();
+    }
+
+    [Test]
     public async Task Validate_UnsupportedEnvelopeFields_RejectsContract()
     {
         ConfigurationManifestV1Alpha2 manifest = ConfigurationManifestTestData.Valid() with

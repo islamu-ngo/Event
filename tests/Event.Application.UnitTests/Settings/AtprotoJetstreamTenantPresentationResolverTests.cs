@@ -272,6 +272,9 @@ internal sealed class FederationReaderFixture : IDisposable
         }
 
         public Task<List<SystemSetting>> GetAllSettings(string? category = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SystemSetting>> GetByKeysForConfigurationExportAsync(
+            IReadOnlyCollection<string> keys, CancellationToken cancellationToken) =>
+            ReadAsync(keys, cancellationToken);
         public Task<bool> IsLocked(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<string?> UpsertAsync(SystemSetting setting, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<string?> UpsertInCurrentTransactionAsync(SystemSetting setting, CancellationToken cancellationToken = default) => throw new NotSupportedException();

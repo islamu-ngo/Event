@@ -6,6 +6,7 @@ using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 namespace Explore.Persistence.Security;
 
@@ -55,18 +56,26 @@ internal sealed class ConfigurationManifestBootstrapProviderOperations
                 before, changes, after, token);
         else
             await WriteSqliteAsync(changes, token);
-        foreach (var change in changes.OfType<JsonObject>()
-                     .Where(change => change["Tag"]?.GetValue<string>() == "Systems"))
+        // Projection queries join the original bootstrap transaction once; they must
+        // not replay a mutation whose file custody and rollback belong to its owner.
+        IExecutionStrategy projection = context.Database.IsNpgsql()
+            ? new NpgsqlRetryingExecutionStrategy(context, maxRetryCount: 0)
+            : context.Database.CreateExecutionStrategy();
+        await projection.ExecuteAsync(async () =>
         {
-            var row = change["After"]?.AsObject();
-            string key = (row ?? change["Before"]!.AsObject())[nameof(SystemSetting.SettingKey)]!.GetValue<string>();
-            await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, key, row is null ? null : new SystemSetting
+            foreach (var change in changes.OfType<JsonObject>()
+                         .Where(change => change["Tag"]?.GetValue<string>() == "Systems"))
             {
-                SettingKey = key,
-                Value = row[nameof(SystemSetting.Value)]!.GetValue<string>(),
-                IsLocked = row[nameof(SystemSetting.IsLocked)]!.GetValue<bool>()
-            }, token);
-        }
+                var row = change["After"]?.AsObject();
+                string key = (row ?? change["Before"]!.AsObject())[nameof(SystemSetting.SettingKey)]!.GetValue<string>();
+                await ManagedTenantProvisioningPolicyProjection.RecordAsync(context, key, row is null ? null : new SystemSetting
+                {
+                    SettingKey = key,
+                    Value = row[nameof(SystemSetting.Value)]!.GetValue<string>(),
+                    IsLocked = row[nameof(SystemSetting.IsLocked)]!.GetValue<bool>()
+                }, token);
+            }
+        });
     }
 
     internal Task WriteEvidenceAsync(JsonObject scope, JsonObject before, JsonArray changes,

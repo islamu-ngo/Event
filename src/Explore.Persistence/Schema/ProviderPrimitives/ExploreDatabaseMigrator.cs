@@ -245,13 +245,22 @@ public static class ExploreDatabaseMigrator
         await PostgresConfigurationImportSnapshotContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportStateContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportLegalSourceContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresConfigurationImportLegalSourceContract.ApplyConfigurationReadPermissionsAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
         await PostgresConfigurationImportLegalMutationContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportPublicationPolicyContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportScalarSettingContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportReceiptContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportPaidPolicyContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresConfigurationImportPaidPolicyContract.ApplyConfigurationReadPermissionsAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
         await PostgresConfigurationImportTenantIdentityContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportBrandingContract.ApplyAsync(executionDatabase, cancellationToken);
+        if (queueEnrollment is not null)
+            await PostgresTenantBrandingReadContract.ApplyAsync(
+                executionDatabase, queueEnrollment, cancellationToken);
         await PostgresConfigurationImportEventResourceContract.ApplyAsync(executionDatabase, cancellationToken);
         await PostgresConfigurationImportTenantSettingContract.ApplyAsync(executionDatabase, cancellationToken);
         if (queueEnrollment is not null)

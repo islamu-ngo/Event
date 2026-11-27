@@ -2,6 +2,7 @@ using Explore.Application.Authentication;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Moderation;
+using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -22,77 +23,113 @@ public sealed partial class ModerationPolicyPublicationRepository
     private readonly HumanAdministratorCommitScope? instanceExportScope;
     private readonly HumanAuthenticationLifetime? instanceExportLifetime;
 
-    public async Task<IReadOnlyList<ModerationPolicyPublication>> AcquireConfigurationExportAsync(
-        ConfigurationImportTarget target, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<ModerationPolicyPublication>> AcquirePublicManifestExportAsync(
+        ConfigurationManifestExportScope scope, CancellationToken cancellationToken)
     {
+        if (scope is not (ConfigurationManifestExportScope.Instance or ConfigurationManifestExportScope.InstanceAndTenants))
+            throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+        return AcquireConfigurationExportCoreAsync(scope, null,
+            HumanAdministratorCommitPurpose.ConfigurationManifestExport, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<ModerationPolicyPublication>> AcquireConfigurationExportAsync(
+        ConfigurationImportTarget target, ConfigurationManifestExportScope? instanceScope,
+        CancellationToken cancellationToken)
+    {
+        if (target is { Scope: ConfigurationImportScope.Instance, TenantId: null }
+            && instanceScope is ConfigurationManifestExportScope.Instance or ConfigurationManifestExportScope.InstanceAndTenants)
+            return AcquireConfigurationExportCoreAsync(instanceScope, null,
+                HumanAdministratorCommitPurpose.ConfigurationImport, cancellationToken);
+        throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+    }
+
+    public Task<IReadOnlyList<ModerationPolicyPublication>> AcquireTenantPackageExportAsync(
+        Guid tenantId, CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty)
+            throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
+        return AcquireConfigurationExportCoreAsync(null, tenantId, null, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ModerationPolicyPublication>> AcquireConfigurationExportCoreAsync(
+        ConfigurationManifestExportScope? instanceScope, Guid? tenantTarget,
+        HumanAdministratorCommitPurpose? instancePurpose, CancellationToken cancellationToken)
+    {
+        // Both modes run on a tenantless Global context: instance export under its native owner, the
+        // tenant package read-only for exactly one tenant selected by explicit predicates below.
         var transaction = context.Database.CurrentTransaction;
-        var nativeAuthority = new ModerationQualificationAuthority(context, admin, machine);
         var requestTenant = context.TenantFilterTenantId;
-        bool nativeInstanceOwner = context.IsConfigurationInstanceImportOwner;
+        bool instanceRead = instancePurpose.HasValue;
         if (transaction is null || !CurrentTransaction(transaction.TransactionId)
-            || machine.IsMachineCaller || target is null
-            || target.Scope is not (ConfigurationImportScope.Instance or ConfigurationImportScope.Tenant)
-            || target.Scope == ConfigurationImportScope.Tenant && target.TenantId != requestTenant
-            || nativeInstanceOwner && (target.Scope != ConfigurationImportScope.Instance || requestTenant is not null)
-            || !nativeInstanceOwner && (requestTenant is not { } selectedTenant
-                || !await nativeAuthority.ProviderTenantMatchesAsync(selectedTenant, cancellationToken)))
+            || machine.IsMachineCaller || requestTenant is not null
+            || context.IsConfigurationInstanceImportOwner != (instancePurpose == HumanAdministratorCommitPurpose.ConfigurationImport)
+            || !instanceRead && (tenantTarget is null || context.IsTenantFilterBypassed))
             throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
         if (context.ChangeTracker.HasChanges())
             throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Conflict);
 
         // Definition export remains usable before moderation installation. Its read authority is
         // therefore acquired from native human/role rows, not a required installation epoch.
-        if (nativeInstanceOwner)
-            await RequireNativeInstanceExportAuthorityAsync(cancellationToken);
-        else
-            await AcquireExportPrincipalAsync(target.Scope, requestTenant!.Value, cancellationToken);
+        if (instancePurpose is { } purpose)
+            await RequireNativeInstanceExportAuthorityAsync(purpose, cancellationToken);
         var host = await context.ModerationHostBindings.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
         if (host is null)
         {
-            if (!CurrentTransaction(transaction.TransactionId)
-                || context.TenantFilterTenantId != requestTenant
-                || !nativeInstanceOwner && !await nativeAuthority.ProviderTenantMatchesAsync(requestTenant!.Value, cancellationToken))
+            if (!CurrentTransaction(transaction.TransactionId) || context.TenantFilterTenantId != requestTenant)
                 throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
-            if (nativeInstanceOwner)
-                await RequireNativeInstanceExportAuthorityAsync(cancellationToken);
+            if (instancePurpose is { } missingHostPurpose)
+                await RequireNativeInstanceExportAuthorityAsync(missingHostPurpose, cancellationToken);
             return Array.Empty<ModerationPolicyPublication>();
         }
-        await RelationalEntityRowFence.AcquireGlobalAsync<ModerationHostBinding>(context, host.Id, cancellationToken);
+        // Row fences are write-privileged no-op updates that hold off concurrent writers; instance
+        // export keeps them. The read-only tenant package relies on this serializable snapshot, and its
+        // owner rejects the package when a second read returns different source publications.
+        if (instanceRead)
+            await RelationalEntityRowFence.AcquireGlobalAsync<ModerationHostBinding>(context, host.Id, cancellationToken);
         var fencedHost = await context.ModerationHostBindings.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
         if (fencedHost is null || fencedHost.Id != host.Id || fencedHost.TrustDomainId != host.TrustDomainId
             || fencedHost.SolutionId != host.SolutionId || fencedHost.InstanceId != host.InstanceId
             || fencedHost.MaintenanceServicePrincipalId != host.MaintenanceServicePrincipalId)
             throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unavailable);
-        await RelationalEntityRowFence.AcquireGlobalAsync<ServicePrincipal>(
-            context, host.MaintenanceServicePrincipalId, cancellationToken);
+        if (instanceRead)
+            await RelationalEntityRowFence.AcquireGlobalAsync<ServicePrincipal>(
+                context, host.MaintenanceServicePrincipalId, cancellationToken);
         if (!await context.ServicePrincipals.AsNoTracking().AnyAsync(
                 row => row.Id == host.MaintenanceServicePrincipalId && !row.IsDeleted, cancellationToken))
             throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unavailable);
 
         var instance = AuthorityScope.Instance(
             AuthorityScope.Solution(AuthorityScope.TrustDomain(host.TrustDomainId), host.SolutionId), host.InstanceId);
-        var tenantQuery = context.Tenants.AsNoTracking();
-        if (target.Scope == ConfigurationImportScope.Instance)
-            tenantQuery = tenantQuery.IgnoreTenantFilter(TenantFilterBypassReasons.InstanceConfigurationManifestExport);
-        else
-            tenantQuery = tenantQuery.Where(row => row.Id == requestTenant);
-        var tenants = await tenantQuery.Where(row => row.TenantStatus.IsActiveState).OrderBy(row => row.Id)
-            .Take(ConfigurationManifestValidator.MaximumTenantCount + 1).ToArrayAsync(cancellationToken);
-        if (tenants.Length > ConfigurationManifestValidator.MaximumTenantCount)
-            throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unavailable);
-        foreach (var tenant in tenants)
+        var scopes = new List<AuthorityScope>();
+        if (instanceRead)
+            scopes.Add(instance);
+        if (instanceScope != ConfigurationManifestExportScope.Instance)
         {
-            await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, tenant.Id, cancellationToken);
-            await RelationalEntityRowFence.AcquireLookupAsync<TenantStatus>(
-                context, [tenant.TenantStatusId], cancellationToken);
-            if (!await tenantQuery.AnyAsync(row => row.Id == tenant.Id
-                    && row.TenantStatusId == tenant.TenantStatusId && row.TenantStatus.IsActiveState, cancellationToken))
+            var tenantQuery = context.Tenants.AsNoTracking().IgnoreTenantFilter(instanceRead
+                ? TenantFilterBypassReasons.InstanceConfigurationManifestExport
+                : TenantFilterBypassReasons.ConfigurationManifestPackageExport);
+            if (!instanceRead)
+                tenantQuery = tenantQuery.Where(row => row.Id == tenantTarget);
+            var candidates = tenantQuery.Where(row => row.TenantStatus.IsActiveState);
+            var tenants = await candidates.OrderBy(row => row.Id)
+                .Take(ConfigurationManifestValidator.MaximumTenantCount + 1).ToArrayAsync(cancellationToken);
+            if (tenants.Length > ConfigurationManifestValidator.MaximumTenantCount || !instanceRead && tenants.Length != 1)
                 throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unavailable);
+            foreach (var tenant in tenants)
+            {
+                if (instanceRead)
+                {
+                    await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, tenant.Id, cancellationToken);
+                    await RelationalEntityRowFence.AcquireLookupAsync<TenantStatus>(
+                        context, [tenant.TenantStatusId], cancellationToken);
+                }
+                if (!await candidates.AnyAsync(row => row.Id == tenant.Id
+                        && row.TenantStatusId == tenant.TenantStatusId, cancellationToken))
+                    throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unavailable);
+                scopes.Add(AuthorityScope.Tenant(instance, tenant.Id));
+            }
         }
 
-        var scopes = tenants.Select(tenant => AuthorityScope.Tenant(instance, tenant.Id)).ToList();
-        if (target.Scope == ConfigurationImportScope.Instance)
-            scopes.Insert(0, instance);
         var result = new List<ModerationPolicyPublication>();
         var priorTrustDomain = context.ModerationTrustDomainId;
         try
@@ -100,36 +137,51 @@ public sealed partial class ModerationPolicyPublicationRepository
             context.ModerationTrustDomainId = host.TrustDomainId;
             // Preserve writer ordering: native source epochs precede jurisdiction slots. Discovery
             // yields only fence coordinates; selected ownership is checked again below.
-            var discovery = context.ModerationPolicyPublications.AsNoTracking();
-            if (target.Scope == ConfigurationImportScope.Instance)
-                discovery = discovery.IgnoreQueryFilters(["ModerationAuthority"]);
-            var scopeIds = scopes.Select(scope => scope.Id).ToArray();
-            var sources = await discovery.Where(row => row.HostBindingId == host.Id
-                    && row.TrustDomainId == host.TrustDomainId
-                    && row.SolutionId == host.SolutionId && row.InstanceId == host.InstanceId
-                    && (row.JurisdictionTenantId == null && scopeIds.Contains(row.InstanceId)
-                        || row.JurisdictionTenantId != null && scopeIds.Contains(row.JurisdictionTenantId.Value)))
+            var discovery = context.ModerationPolicyPublications.AsNoTracking()
+                .IgnoreQueryFilters(["ModerationAuthority"]);
+            discovery = discovery.Where(row => row.HostBindingId == host.Id
+                && row.TrustDomainId == host.TrustDomainId
+                && row.SolutionId == host.SolutionId && row.InstanceId == host.InstanceId);
+            var selections = context.ModerationPolicySelections.AsNoTracking()
+                .IgnoreQueryFilters(["ModerationAuthority"]);
+            if (instanceScope == ConfigurationManifestExportScope.Instance)
+            {
+                // Fence only the selected instance publication's provenance, not all historical
+                // instance source epochs. The slot read below rechecks the selection after fencing.
+                discovery = discovery.Where(row => row.JurisdictionTenantId == null
+                    && selections.Any(selection => selection.HostBindingId == host.Id
+                        && selection.JurisdictionId == instance.Id && selection.JurisdictionTenantId == null
+                        && selection.LatestPublicationId == row.Id));
+            }
+            else if (instanceRead)
+            {
+                var tenantIds = scopes.Where(scope => scope.Kind == ModerationScopeKind.Tenant)
+                    .Select(scope => scope.Id).ToArray();
+                discovery = discovery.Where(row => row.JurisdictionTenantId == null
+                    || row.JurisdictionTenantId.HasValue && tenantIds.Contains(row.JurisdictionTenantId.Value));
+            }
+            else
+                discovery = discovery.Where(row => row.JurisdictionTenantId == tenantTarget);
+            var sources = await discovery
                 .Select(row => row.AuthoritySourceId).Distinct().Order().ToArrayAsync(cancellationToken);
-            foreach (var source in sources)
-                await RelationalEntityRowFence.AcquireGlobalAsync<ModerationQualificationEpoch>(context, source, cancellationToken);
+            if (instanceRead)
+                foreach (var source in sources)
+                    await RelationalEntityRowFence.AcquireGlobalAsync<ModerationQualificationEpoch>(context, source, cancellationToken);
             foreach (var scope in scopes)
             {
                 await using var slot = await AcquireSlotAsync(host.Id, scope, cancellationToken);
                 // Only definition metadata crosses tenant scope, after native instance authority.
                 // This replaces the exact named metadata filter with explicit ownership predicates;
                 // it never disables Tenant/SoftDelete, changes request context or changes PostgreSQL GUCs.
-                var selections = context.ModerationPolicySelections.AsNoTracking();
-                var graph = context.ModerationPolicyPublications.AsNoTracking();
-                if (target.Scope == ConfigurationImportScope.Instance)
-                {
-                    selections = selections.IgnoreQueryFilters(["ModerationAuthority"]);
-                    graph = graph.IgnoreQueryFilters(["ModerationAuthority"]);
-                }
-                var selection = await selections.SingleOrDefaultAsync(row =>
-                    row.HostBindingId == host.Id && row.JurisdictionId == scope.Id, cancellationToken);
+                var graph = context.ModerationPolicyPublications.AsNoTracking()
+                    .IgnoreQueryFilters(["ModerationAuthority"]);
+                Guid? jurisdictionTenant = scope.Kind == ModerationScopeKind.Tenant ? scope.Id : null;
+                var selectionQuery = selections.Where(row => row.HostBindingId == host.Id && row.JurisdictionId == scope.Id);
+                if (instanceScope == ConfigurationManifestExportScope.Instance)
+                    selectionQuery = selectionQuery.Where(row => row.JurisdictionTenantId == null);
+                var selection = await selectionQuery.SingleOrDefaultAsync(cancellationToken);
                 if (selection is null)
                     continue;
-                Guid? jurisdictionTenant = scope.Kind == ModerationScopeKind.Tenant ? scope.Id : null;
                 if (selection.TrustDomainId != host.TrustDomainId
                     || selection.JurisdictionTenantId != jurisdictionTenant
                     || selection.Revision is < 1 or long.MaxValue)
@@ -149,9 +201,8 @@ public sealed partial class ModerationPolicyPublicationRepository
 
                 // An instance definition can originate in a different native tenant from this
                 // request. Verify its actual source epoch rather than borrowing the request epoch.
-                var epochs = context.ModerationQualificationEpochs.AsNoTracking();
-                if (target.Scope == ConfigurationImportScope.Instance)
-                    epochs = epochs.IgnoreQueryFilters(["ModerationQualification"]);
+                var epochs = context.ModerationQualificationEpochs.AsNoTracking()
+                    .IgnoreQueryFilters(["ModerationQualification"]);
                 var epoch = await epochs.SingleOrDefaultAsync(row => row.Id == publication.AuthoritySourceId
                     && row.HostBindingId == host.Id && row.TenantId == publication.TenantId, cancellationToken);
                 if (!sources.Contains(publication.AuthoritySourceId)
@@ -162,11 +213,10 @@ public sealed partial class ModerationPolicyPublicationRepository
             }
             if (!CurrentTransaction(transaction.TransactionId) || context.ChangeTracker.HasChanges()
                 || context.ModerationTrustDomainId != host.TrustDomainId
-                || context.TenantFilterTenantId != requestTenant
-                || !nativeInstanceOwner && !await nativeAuthority.ProviderTenantMatchesAsync(requestTenant!.Value, cancellationToken))
+                || context.TenantFilterTenantId != requestTenant)
                 throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
-            if (nativeInstanceOwner)
-                await RequireNativeInstanceExportAuthorityAsync(cancellationToken);
+            if (instancePurpose is { } finalPurpose)
+                await RequireNativeInstanceExportAuthorityAsync(finalPurpose, cancellationToken);
             return result.AsReadOnly();
         }
         finally
@@ -175,7 +225,8 @@ public sealed partial class ModerationPolicyPublicationRepository
         }
     }
 
-    private async Task RequireNativeInstanceExportAuthorityAsync(CancellationToken token)
+    private async Task RequireNativeInstanceExportAuthorityAsync(
+        HumanAdministratorCommitPurpose purpose, CancellationToken token)
     {
         var lease = instanceExportLease
             ?? throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
@@ -198,8 +249,8 @@ public sealed partial class ModerationPolicyPublicationRepository
         {
             lease.RequireOriginalOwner(context);
             scope.RequireOwner(context);
-            if (machine.IsMachineCaller || !context.IsConfigurationInstanceImportOwner
-                || scope.Purpose != HumanAdministratorCommitPurpose.ConfigurationImport
+            if (machine.IsMachineCaller || scope.Purpose != purpose
+                || context.IsConfigurationInstanceImportOwner != (purpose == HumanAdministratorCommitPurpose.ConfigurationImport)
                 || scope.TenantId is not null || lease.SelectedTenantId is not null
                 || lease.PolicyPurpose is not (null or Explore.Application.Contracts.Operations.PolicyMutationPurpose.Standard)
                 || context.TenantFilterTenantId is not null || context.IsTenantFilterBypassed
@@ -214,62 +265,5 @@ public sealed partial class ModerationPolicyPublicationRepository
             if (!lifetime.IsValidAt(clock.GetUtcNow()))
                 throw new UnauthorizedAccessException("The original instance-export credential lifetime has ended.");
         }
-    }
-
-    private async Task AcquireExportPrincipalAsync(
-        ConfigurationImportScope scope, Guid tenantId, CancellationToken token)
-    {
-        var userId = await admin.ResolveUserIdAsync(token)
-            ?? throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Unauthenticated);
-        await RelationalEntityRowFence.AcquireGlobalAsync<User>(context, userId, token);
-        if (!await context.Users.AsNoTracking().AnyAsync(row => row.Id == userId && !row.IsDeleted, token))
-            throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
-        foreach (var id in await context.UserExternalLogins.AsNoTracking().Where(row => row.UserId == userId)
-                     .OrderBy(row => row.Id).Select(row => row.Id).ToArrayAsync(token))
-            await RelationalEntityRowFence.AcquireGlobalAsync<UserExternalLogin>(context, id, token);
-        var platform = await context.PlatformUserRoles.AsNoTracking().Where(row => row.UserId == userId)
-            .OrderBy(row => row.Id).Select(row => new { row.Id, row.RoleId }).ToArrayAsync(token);
-        foreach (var grant in platform)
-            await RelationalEntityRowFence.AcquireGlobalAsync<PlatformUserRole>(context, grant.Id, token);
-        var roleIds = platform.Select(row => row.RoleId).Distinct().Order().ToArray();
-        foreach (var roleId in roleIds)
-            await RelationalEntityRowFence.AcquireLookupAsync<Role>(context, [roleId], token);
-        var grantIds = platform.Select(row => row.Id).ToArray();
-        var instanceAdministrator = await context.PlatformUserRoles.AsNoTracking().AnyAsync(row =>
-            grantIds.Contains(row.Id) && roleIds.Contains(row.RoleId) && row.UserId == userId
-            && !row.User.IsDeleted && row.Role.RoleScopeId == (int)RoleScopeEnum.Platform
-            && row.Role.MasterCode == "platform.admin", token);
-        var tenantAdministrator = false;
-        if (scope == ConfigurationImportScope.Tenant && !instanceAdministrator)
-        {
-            var memberships = await context.TenantUsers.AsNoTracking()
-                .Where(row => row.TenantId == tenantId && row.UserId == userId)
-                .OrderBy(row => row.Id).Select(row => row.Id).ToArrayAsync(token);
-            foreach (var id in memberships)
-                await RelationalEntityRowFence.AcquireAsync<TenantUser>(context, tenantId, row => row.Id, id, token);
-            var grants = await context.TenantUserRoleGrants.AsNoTracking()
-                .Where(row => row.TenantId == tenantId && memberships.Contains(row.TenantUserId))
-                .OrderBy(row => row.Id).Select(row => new { row.Id, row.RoleId }).ToArrayAsync(token);
-            foreach (var grant in grants)
-                await RelationalEntityRowFence.AcquireAsync<TenantUserRoleGrant>(
-                    context, tenantId, row => row.Id, grant.Id, token);
-            foreach (var roleId in grants.Select(row => row.RoleId).Distinct().Order())
-                await RelationalEntityRowFence.AcquireLookupAsync<Role>(context, [roleId], token);
-            var tenantGrantIds = grants.Select(row => row.Id).ToArray();
-            tenantAdministrator = await context.TenantUserRoleGrants.AsNoTracking().AnyAsync(row =>
-                tenantGrantIds.Contains(row.Id) && row.TenantId == tenantId && memberships.Contains(row.TenantUserId)
-                && row.TenantUser.UserId == userId && !row.TenantUser.User.IsDeleted && !row.TenantUser.IsDeleted
-                && row.TenantUser.StatusId == (int)TenantUserStatusEnum.Active && row.RevokedAt == null
-                && row.RoleId == (int)RoleEnum.TenantAdmin && row.RoleScopeId == (int)RoleScopeEnum.Tenant
-                && row.Role.RoleScopeId == (int)RoleScopeEnum.Tenant, token);
-        }
-        if (!instanceAdministrator && !tenantAdministrator || await admin.ResolveUserIdAsync(token) != userId)
-            throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
-        await RelationalEntityRowFence.AcquireGlobalAsync<Tenant>(context, tenantId, token);
-        var tenant = await context.Tenants.AsNoTracking().SingleOrDefaultAsync(row => row.Id == tenantId, token)
-            ?? throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
-        await RelationalEntityRowFence.AcquireLookupAsync<TenantStatus>(context, [tenant.TenantStatusId], token);
-        if (!await context.Tenants.AsNoTracking().AnyAsync(row => row.Id == tenantId && row.TenantStatus.IsActiveState, token))
-            throw new ModerationConfigurationImportException(ModerationPolicyPublicationOutcome.Denied);
     }
 }

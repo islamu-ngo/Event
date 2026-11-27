@@ -204,7 +204,7 @@ public sealed class ResourceVisitorHumanCommitAuthorityTests
             await fixture.Context.SaveChangesAsync();
         }
         var executor = fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>();
-        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, default);
+        var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, ConfigurationManifestExportScope.InstanceAndTenants, default);
         var manifest = JsonNode.Parse(snapshot.Utf8Json.Span)!;
         string slug = await fixture.Context.Tenants.Where(row => row.Id == fixture.TenantId)
             .Select(row => row.Slug).SingleAsync();

@@ -1,0 +1,31 @@
+Change-Id: CHG-01M829F3V2NDGVFD10QK8MQH24
+Title: "Instance-only manifest exports with explicit tenant inclusion"
+Type: feat
+Scope: self-hosting
+Summary: "Instance manifests support zero tenants and exports include tenant configuration only when explicitly selected."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Manifest exports default to Instance; clients must explicitly request InstanceAndTenants to include eligible tenant configuration. Public artifact metadata names current configuration rather than an earlier bootstrap input.
+  Security:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Public exports use a dedicated human Global owner with live credential and administrator checks; snapshots retain entry identity through child disposal. Legal and policy configuration projections use fixed read columns under tenant RLS, excluding policy actor audit fields.
+  Migration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: No EF schema migration is required; normal startup preparation applies fixed Global and tenant-bound Runtime legal-source and policy configuration read permissions without write grants.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Instance manifests admit omitted or empty tenant sections; snapshot extent follows the admitted source sections independently of export view.
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: documented
+    Detail: The export route accepts Instance and InstanceAndTenants scope values, with Instance as its default.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/configuration-manifests.md
+    Disposition: documented
+    Detail: Operators can export instance configuration before tenant provisioning and explicitly select combined output when needed.

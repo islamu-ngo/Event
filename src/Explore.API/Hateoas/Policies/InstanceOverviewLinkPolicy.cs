@@ -98,11 +98,23 @@ public sealed class InstanceOverviewLinkPolicy : ILinkPolicy<InstanceOverviewDto
 
         yield return ConfigurationManifestExportLink(
             LinkRelations.ExportConfigurationOverrides,
-            ConfigurationManifestExportView.Overrides);
+            ConfigurationManifestExportView.Overrides,
+            ConfigurationManifestExportScope.Instance);
 
         yield return ConfigurationManifestExportLink(
             LinkRelations.ExportConfigurationPortable,
-            ConfigurationManifestExportView.Portable);
+            ConfigurationManifestExportView.Portable,
+            ConfigurationManifestExportScope.Instance);
+
+        yield return ConfigurationManifestExportLink(
+            LinkRelations.ExportConfigurationOverridesWithTenants,
+            ConfigurationManifestExportView.Overrides,
+            ConfigurationManifestExportScope.InstanceAndTenants);
+
+        yield return ConfigurationManifestExportLink(
+            LinkRelations.ExportConfigurationPortableWithTenants,
+            ConfigurationManifestExportView.Portable,
+            ConfigurationManifestExportScope.InstanceAndTenants);
 
         yield return new LinkDefinition(
                 LinkRelations.CreateConfigurationImportSession,
@@ -146,11 +158,12 @@ public sealed class InstanceOverviewLinkPolicy : ILinkPolicy<InstanceOverviewDto
 
     private static LinkDefinition ConfigurationManifestExportLink(
         string relation,
-        ConfigurationManifestExportView view) =>
+        ConfigurationManifestExportView view,
+        ConfigurationManifestExportScope scope) =>
         new LinkDefinition(
                 relation,
                 RouteNames.ExportConfigurationManifest,
-                new { view = view.ToString() },
+                new { view = view.ToString(), scope = scope.ToString() },
                 HttpMethods.Get,
                 view == ConfigurationManifestExportView.Portable
                     ? "Export portable configuration manifest"

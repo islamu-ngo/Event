@@ -15,6 +15,7 @@ public class SystemSettingRepository : ISystemSettingRepository
     private readonly ExploreDbContext _dbContext;
     private readonly ISettingMutationLock _mutationLock;
     private readonly HumanSettingsDataBoundary? _humanBoundary;
+    private readonly PostgresNativeQueueEnrollment? _enrollment;
 
     private SystemSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock)
     {
@@ -29,11 +30,13 @@ public class SystemSettingRepository : ISystemSettingRepository
     public SystemSettingRepository(
         ExploreDbContext dbContext,
         ISettingMutationLock mutationLock,
-        HumanSettingsDataBoundary humanBoundary)
+        HumanSettingsDataBoundary humanBoundary,
+        PostgresNativeQueueEnrollment? enrollment = null)
     {
         _dbContext = dbContext;
         _mutationLock = mutationLock;
         _humanBoundary = humanBoundary;
+        _enrollment = enrollment;
     }
 
     public async Task<SystemSetting?> GetByKey(
@@ -179,6 +182,24 @@ public class SystemSettingRepository : ISystemSettingRepository
             .OrderBy(s => s.Category)
             .ThenBy(s => s.DisplayOrder)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SystemSetting>> GetByKeysForConfigurationExportAsync(
+        IReadOnlyCollection<string> keys, CancellationToken cancellationToken)
+    {
+        string[] selectedKeys = keys.Distinct(StringComparer.Ordinal).ToArray();
+        if (_dbContext.Database.IsNpgsql() && !_dbContext.IsConfigurationInstanceImportOwner)
+        {
+            var image = await PostgresOrdinarySettingsContract.ReadHierarchyAsync(
+                _dbContext, _enrollment
+                    ?? throw new UnauthorizedAccessException("Configuration reads require ordinary settings enrollment."),
+                null, selectedKeys, cancellationToken);
+            return image.System;
+        }
+        return await _dbContext.SystemSettings.AsNoTracking()
+            .Where(setting => selectedKeys.Contains(setting.SettingKey))
+            .OrderBy(setting => setting.SettingKey)
+            .ToArrayAsync(cancellationToken);
     }
 
     public async Task<bool> IsLocked(string key, CancellationToken cancellationToken = default)

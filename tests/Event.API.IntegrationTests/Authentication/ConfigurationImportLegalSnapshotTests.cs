@@ -42,7 +42,7 @@ public sealed class ConfigurationImportLegalSnapshotTests
             fixture.Context.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
         await fixture.Context.SaveChangesAsync();
         var source = await fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>()
-            .ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, default);
+            .ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, ConfigurationManifestExportScope.InstanceAndTenants, default);
         fixture.Context.ChangeTracker.Clear();
         await fixture.Context.LegalDocumentLocalizedSources
             .Where(row => row.LegalDocumentVersionId == document.Versions[0].Id).ExecuteDeleteAsync();
@@ -75,7 +75,7 @@ public sealed class ConfigurationImportLegalSnapshotTests
                 ConfigurationImportTarget.ForInstance(), source.Utf8Json, selection,
                 preparation.Subject!, fixture.UserId, DateTime.UtcNow, digest, parser, default);
             var actual = await owner.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>()
-                .ReadImportSnapshotAsync(ConfigurationManifestExportView.Overrides, null, default);
+                .ReadImportSnapshotAsync(ConfigurationManifestExportView.Overrides, ConfigurationManifestExportScope.InstanceAndTenants, default);
             using JsonDocument artifact = JsonDocument.Parse(actual.Utf8Json);
             JsonElement legal = artifact.RootElement.GetProperty("spec").GetProperty("instance")
                 .GetProperty("legalDocuments").GetProperty(nameof(LegalDocumentKind.TermsOfService));
@@ -113,7 +113,7 @@ public sealed class ConfigurationImportLegalSnapshotTests
         fixture.Context.ChangeTracker.Clear();
 
         var snapshot = await fixture.Services.GetRequiredService<IConfigurationInstanceImportExecutor>()
-            .ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, default);
+            .ReadSnapshotAsync(ConfigurationManifestExportView.Overrides, ConfigurationManifestExportScope.InstanceAndTenants, default);
 
         using JsonDocument artifact = JsonDocument.Parse(snapshot.Utf8Json);
         JsonElement spec = artifact.RootElement.GetProperty("spec");

@@ -3,6 +3,20 @@ Source: API routes and generated OpenAPI contracts.
 
 # API Changelog
 
+## 2026-11-22
+
+- **Instance-only configuration export and optional tenant declarations.**
+  The existing instance-management export route adds an explicit scope choice
+  independently of Overrides/Portable view. The default is Instance; clients
+  request InstanceAndTenants explicitly and follow the exact authorized HAL link.
+  Omitted or empty manifest tenant lists request no tenant actions; explicit null
+  and conflicting export metadata fail validation. Combined export may contain
+  zero tenants. Exact tenant packages keep their target and authorization rules.
+  The pre-release contract remains v1alpha2; deploy regenerated schemas, API and
+  clients together. Wire omission/null tests have observed Red/Green evidence;
+  remaining endpoint, import, provider and generated-contract acceptance is pending
+  in the implementation branch.
+
 ## 2026-10-25
 
 - Managed event-program responses copy their sessions, groups, days and agenda

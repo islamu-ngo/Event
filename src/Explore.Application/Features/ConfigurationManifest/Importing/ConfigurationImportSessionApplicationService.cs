@@ -92,7 +92,8 @@ public sealed record ConfigurationImportPreviewResult(
 
 internal sealed record ConfigurationImportPreviewPreparation(
     ConfigurationImportPreviewInput Input,
-    ReadOnlyMemory<byte> CurrentTargetArtifact);
+    ReadOnlyMemory<byte> CurrentTargetArtifact,
+    ConfigurationManifestExportScope? InstanceSnapshotScope);
 
 public sealed class ConfigurationImportSessionApplicationService(
     ConfigurationImportSessionManager manager,
@@ -389,7 +390,8 @@ public sealed class ConfigurationImportSessionApplicationService(
         ConfigurationImportAuthorizedArtifact source,
         ConfigurationImportPreviewRequest request,
         CancellationToken cancellationToken,
-        bool inCurrentTransaction = false)
+        bool inCurrentTransaction = false,
+        ConfigurationManifestExportScope? retainedInstanceScope = null)
     {
         if (request.ApplyMode == ConfigurationImportApplyMode.ReconcileManaged)
         {
@@ -414,17 +416,31 @@ public sealed class ConfigurationImportSessionApplicationService(
 
         ConfigurationImportParsedArtifact? parsedTarget = null;
         ReadOnlyMemory<byte> currentTargetArtifact;
-        ImmutableArray<ConfigurationImportSectionSnapshot> sourceSections;
+        ImmutableArray<ConfigurationImportSectionSnapshot> sourceSections =
+            target.Scope == ConfigurationImportScope.Instance
+                ? ConfigurationImportArtifactSnapshotFactory.FromManifest(parsedSourceManifest!.Manifest)
+                : ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(parsedSourcePackage!.Package);
+        var available = sourceSections
+            .Select(section => section.SectionKey)
+            .ToHashSet(StringComparer.Ordinal);
+        if (request.SelectedSectionKeys.Any(section => !available.Contains(section)))
+        {
+            throw new ConfigurationImportSessionException(
+                ConfigurationImportFailureCodes.ApplyBlocked);
+        }
+        ConfigurationManifestExportScope? instanceScope = target.Scope == ConfigurationImportScope.Instance
+            ? retainedInstanceScope ?? (request.SelectedSectionKeys.Any(section =>
+                section.StartsWith("tenant.", StringComparison.Ordinal))
+                    ? ConfigurationManifestExportScope.InstanceAndTenants
+                    : ConfigurationManifestExportScope.Instance)
+            : null;
         ImmutableArray<ConfigurationImportSectionSnapshot> targetSections;
         if (target.Scope == ConfigurationImportScope.Instance)
         {
             ConfigurationManifestExportResult current = await currentState.ReadImportSnapshotAsync(
-                targetView, null, cancellationToken);
+                targetView, instanceScope!.Value, cancellationToken);
             parsedTarget = parser.Parse(current.Utf8Json);
             currentTargetArtifact = current.Utf8Json;
-            sourceSections =
-                ConfigurationImportArtifactSnapshotFactory.FromManifest(
-                    parsedSourceManifest!.Manifest);
             targetSections =
                 ConfigurationImportArtifactSnapshotFactory.FromManifest(
                     parsedTarget.Manifest);
@@ -442,24 +458,12 @@ public sealed class ConfigurationImportSessionApplicationService(
                     ConfigurationImportFailureCodes.ArtifactMissing);
             }
 
-            sourceSections =
-                ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(
-                    parsedSourcePackage!.Package);
             TenantConfigurationPackageExportResult current = await currentState.ReadTenantInCurrentTransactionAsync(
                 tenant.Id, targetView, cancellationToken);
             currentTargetArtifact = current.Utf8Json;
             targetSections =
                 ConfigurationImportArtifactSnapshotFactory.FromTenantPackage(
                     parser.ParseTenantPackage(currentTargetArtifact).Package);
-        }
-
-        var available = sourceSections
-            .Select(section => section.SectionKey)
-            .ToHashSet(StringComparer.Ordinal);
-        if (request.SelectedSectionKeys.Any(section => !available.Contains(section)))
-        {
-            throw new ConfigurationImportSessionException(
-                ConfigurationImportFailureCodes.ApplyBlocked);
         }
 
         string[] requiredApprovals = RequiredApprovals(
@@ -586,7 +590,8 @@ public sealed class ConfigurationImportSessionApplicationService(
                 nativePreview);
             return new ConfigurationImportPreviewPreparation(
                 input,
-                currentTargetArtifact);
+                currentTargetArtifact,
+                instanceScope);
         }
         catch (ArgumentException)
         {

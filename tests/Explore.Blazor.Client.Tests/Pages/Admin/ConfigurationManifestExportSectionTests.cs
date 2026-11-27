@@ -9,9 +9,46 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
 {
     private const string OverridesRelation = "export-configuration-overrides";
     private const string PortableRelation = "export-configuration-portable";
+    private const string OverridesWithTenantsRelation = "export-configuration-overrides-with-tenants";
+    private const string PortableWithTenantsRelation = "export-configuration-portable-with-tenants";
     private readonly BlazorTestContext _ctx = new();
 
     public void Dispose() => _ctx.Dispose();
+
+    [Test]
+    public async Task ExportScopeDefaultsToInstanceEvenWhenCombinedExportsAreAvailable()
+    {
+        _ctx.Services.AddSingleton(ExportService(Overview(
+            OverridesRelation, PortableRelation, OverridesWithTenantsRelation, PortableWithTenantsRelation)));
+
+        var cut = _ctx.Render<ConfigurationManifestExportSection>();
+        cut.WaitForAssertion(() => cut.Find("[role='radiogroup'][aria-label='Export scope']"));
+
+        var instance = cut.FindAll("label").Single(label =>
+            label.TextContent.Contains("Instance only", StringComparison.Ordinal)).QuerySelector("input")!;
+        var combined = cut.FindAll("label").Single(label =>
+            label.TextContent.Contains("Instance and eligible tenants", StringComparison.Ordinal)).QuerySelector("input")!;
+        await Assert.That(instance.HasAttribute("checked")).IsTrue();
+        await Assert.That(combined.HasAttribute("checked")).IsFalse();
+        await Assert.That(cut.FindAll("button[aria-label^='Download ']")).Count().IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task CombinedOnlyCapabilityRequiresExplicitScopeChoiceBeforeShowingDownload()
+    {
+        _ctx.Services.AddSingleton(ExportService(Overview(OverridesWithTenantsRelation)));
+
+        var cut = _ctx.Render<ConfigurationManifestExportSection>();
+        cut.WaitForAssertion(() => cut.Find("[role='radiogroup'][aria-label='Export scope']"));
+        await Assert.That(cut.FindAll("button[aria-label^='Download ']")).IsEmpty();
+
+        await cut.FindAll("label").Single(label =>
+            label.TextContent.Contains("Instance and eligible tenants", StringComparison.Ordinal))
+            .QuerySelector("input")!.ClickAsync(new());
+
+        await Assert.That(cut.FindAll("button[aria-label='Download configuration overrides']")).HasSingleItem();
+        await Assert.That(cut.FindAll("button[aria-label='Download portable configuration']")).IsEmpty();
+    }
 
     [Test]
     public async Task Render_WithBothHalCapabilitiesShowsOnlyPrimaryDownloadActions()
@@ -50,6 +87,7 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
         var service = ExportService(capabilities);
         service.DownloadAsync(
                 ConfigurationManifestExportView.Overrides,
+                ConfigurationManifestExportScope.Instance,
                 Arg.Any<CancellationToken>())
             .Returns(new ConfigurationManifestDownloadResult(true, capabilities));
         _ctx.Services.AddSingleton(service);
@@ -61,6 +99,7 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
         cut.WaitForAssertion(() =>
             service.Received(1).DownloadAsync(
                 ConfigurationManifestExportView.Overrides,
+                ConfigurationManifestExportScope.Instance,
                 Arg.Any<CancellationToken>()));
 
         await announcer.Received(1).AnnouncePoliteAsync(
@@ -73,6 +112,7 @@ public sealed class ConfigurationManifestExportSectionTests : IDisposable
         var service = ExportService(Overview(PortableRelation));
         service.DownloadAsync(
                 ConfigurationManifestExportView.Portable,
+                ConfigurationManifestExportScope.Instance,
                 Arg.Any<CancellationToken>())
             .Returns(new ConfigurationManifestDownloadResult(false, Overview()));
         _ctx.Services.AddSingleton(service);

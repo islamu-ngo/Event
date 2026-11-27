@@ -592,14 +592,20 @@ public static class LinkRelations
     public const string RejectAction = "reject-action";
 
     /// <summary>
-    /// Downloads instance and tenant overrides as one current-instance manifest.
+    /// Downloads instance-only configuration overrides.
     /// </summary>
     public const string ExportConfigurationOverrides = "export-configuration-overrides";
 
     /// <summary>
-    /// Downloads flattened effective instance and tenant values as a portable manifest.
+    /// Downloads flattened effective instance-only configuration.
     /// </summary>
     public const string ExportConfigurationPortable = "export-configuration-portable";
+
+    /// <summary>Downloads instance and eligible tenant configuration overrides.</summary>
+    public const string ExportConfigurationOverridesWithTenants = "export-configuration-overrides-with-tenants";
+
+    /// <summary>Downloads flattened instance and eligible tenant configuration.</summary>
+    public const string ExportConfigurationPortableWithTenants = "export-configuration-portable-with-tenants";
 
     #endregion
 

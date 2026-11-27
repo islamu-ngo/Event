@@ -41,4 +41,13 @@ public interface ITenantSettingsDocumentRepository : IGenericRepository<TenantSe
         Guid tenantId,
         IEnumerable<string> documentKeys,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads stored tenant documents for configuration export; a tenant-bound read of a
+    /// different tenant fails closed instead of returning no rows.
+    /// </summary>
+    Task<IReadOnlyList<TenantSettingsDocument>> GetManyForConfigurationExportAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> documentKeys,
+        CancellationToken cancellationToken);
 }

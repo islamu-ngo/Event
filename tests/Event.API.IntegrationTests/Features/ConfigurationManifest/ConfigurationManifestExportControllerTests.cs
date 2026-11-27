@@ -21,7 +21,6 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using NSubstitute;
 
 public sealed class ConfigurationManifestExportControllerTests
 {
@@ -65,17 +64,52 @@ public sealed class ConfigurationManifestExportControllerTests
         await Assert.That(callerInputs.Any(parameter => parameter.ParameterType == typeof(Guid)))
             .IsFalse()
             .Because("a caller must not select an instance identity");
-        await Assert.That(callerInputs).HasSingleItem();
+        await Assert.That(callerInputs.Select(parameter => parameter.Name))
+            .IsEquivalentTo(["view", "scope"]);
 
-        ProducesAttribute produces = action.GetCustomAttribute<ProducesAttribute>()
-            ?? throw new InvalidOperationException("The export media type must be explicit.");
-        await Assert.That(produces.ContentTypes).Contains(ConfigurationManifestContractMetadata.MediaType);
+        await Assert.That(action.GetCustomAttribute<ProducesAttribute>()).IsNull()
+            .Because("an action-level Produces filter would rewrite ProblemDetails content types");
+        var success = action.GetCustomAttributes()
+            .OfType<Microsoft.AspNetCore.Mvc.ApiExplorer.IApiResponseMetadataProvider>()
+            .Single(metadata => metadata.StatusCode == StatusCodes.Status200OK);
+        var successTypes = new Microsoft.AspNetCore.Mvc.Formatters.MediaTypeCollection();
+        success.SetContentTypes(successTypes);
+        await Assert.That(successTypes).Contains(ConfigurationManifestContractMetadata.MediaType);
         AssertProblemResponse(action, StatusCodes.Status400BadRequest);
         AssertProblemResponse(action, StatusCodes.Status401Unauthorized);
         AssertProblemResponse(action, StatusCodes.Status403Forbidden);
         AssertProblemResponse(action, StatusCodes.Status413PayloadTooLarge);
         AssertProblemResponse(action, StatusCodes.Status429TooManyRequests);
         AssertProblemResponse(action, StatusCodes.Status503ServiceUnavailable);
+    }
+
+    [Test]
+    [Arguments("-1")]
+    [Arguments("99")]
+    [Arguments("UnknownScope")]
+    public async Task UnsupportedExportScopeReturnsBadRequest(string scope)
+    {
+        await using var factory = new AuthenticatedWebApplicationFactory
+        {
+            AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true },
+            SeedActiveDefaultTenant = true
+        };
+        using HttpClient client = factory.CreateClient();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, $"{PrimaryPath}?view=Overrides&scope={scope}");
+        request.Headers.Add(
+            TestAuthHandler.AuthHeaderName,
+            TestAuthHandler.CreateInstanceAdminHeaderValue(
+                Guid.Parse("0199464e-e388-7f56-9281-cefabd6a5673")));
+
+        using HttpResponseMessage response = await client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(response.Content.Headers.ContentType?.MediaType)
+            .IsEqualTo("application/problem+json");
+        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
+        await Assert.That(problem.RootElement.GetProperty("status").GetInt32())
+            .IsEqualTo(StatusCodes.Status400BadRequest);
     }
 
     [Test]
@@ -187,45 +221,10 @@ public sealed class ConfigurationManifestExportControllerTests
     }
 
     [Test]
-    public async Task TenantBoundOverflowReturnsStablePayloadTooLargeProblem()
+    public async Task ExportTooLargeReturnsStablePayloadTooLargeProblem()
     {
-        var tenants = Substitute.For<ITenantRepository>();
-        tenants.GetAllActiveForConfigurationManifestExportAsync(
-                Arg.Any<int>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Enumerable.Range(0, ConfigurationManifestValidator.MaximumTenantCount + 1)
-                .Select(index => new Tenant
-                {
-                    Id = Guid.CreateVersion7(),
-                    Slug = $"overflow-{index}",
-                    FullName = $"Overflow {index}",
-                    TenantStatusId = (int)TenantStatusEnum.Active,
-                    TenantStatus = new TenantStatus
-                    {
-                        Id = (int)TenantStatusEnum.Active,
-                        MasterCode = "active",
-                        FullName = "Active",
-                        IsActiveState = true
-                    }
-                })
-                .ToArray());
-        tenants.GetByIdAsNoTrackingAsync(
-                Explore.Domain.Constants.PlatformDefaults.DefaultTenantId,
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<Tenant?>(new Tenant
-            {
-                Id = Explore.Domain.Constants.PlatformDefaults.DefaultTenantId,
-                Slug = "default",
-                FullName = "Default",
-                TenantStatusId = (int)TenantStatusEnum.Active,
-                TenantStatus = new TenantStatus
-                {
-                    Id = (int)TenantStatusEnum.Active,
-                    MasterCode = "active",
-                    FullName = "Active",
-                    IsActiveState = true
-                }
-            }));
+        // The tenant-limit decision itself is proven against the real reader in persistence tests;
+        // this case proves the HTTP contract for that outcome.
         await using var baseFactory = new AuthenticatedWebApplicationFactory
         {
             AuthorizationProviderOverride = new StubAuthorizationProvider { AllowAll = true },
@@ -234,13 +233,13 @@ public sealed class ConfigurationManifestExportControllerTests
         await using var factory = baseFactory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.RemoveAll<ITenantRepository>();
-                services.AddScoped(_ => tenants);
+                // Replace the persistence port behind the real protected handler, not the handler.
+                services.RemoveAll<IConfigurationManifestExportExecutor>();
+                services.AddScoped<IConfigurationManifestExportExecutor, TooLargeExportExecutor>();
             }));
         using HttpClient client = factory.CreateClient();
         using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"{PrimaryPath}?view=Overrides");
+            HttpMethod.Get, $"{PrimaryPath}?view=Overrides&scope=InstanceAndTenants");
         request.Headers.Add(
             TestAuthHandler.AuthHeaderName,
             TestAuthHandler.CreateInstanceAdminHeaderValue(
@@ -248,14 +247,20 @@ public sealed class ConfigurationManifestExportControllerTests
 
         using HttpResponseMessage response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode)
-            .IsEqualTo(HttpStatusCode.RequestEntityTooLarge);
-        using JsonDocument problem = JsonDocument.Parse(
-            await response.Content.ReadAsByteArrayAsync());
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.RequestEntityTooLarge);
+        await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
+        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync());
         await Assert.That(problem.RootElement.GetProperty("status").GetInt32())
             .IsEqualTo(StatusCodes.Status413PayloadTooLarge);
         await Assert.That(problem.RootElement.GetProperty("code").GetString())
             .IsEqualTo(ConfigurationManifestExportContract.TooLargeFailureCode);
+    }
+
+    private sealed class TooLargeExportExecutor : IConfigurationManifestExportExecutor
+    {
+        public Task<ConfigurationManifestExportResult> ExportAsync(
+            ConfigurationManifestExportView view, ConfigurationManifestExportScope scope, CancellationToken token) =>
+            throw new ConfigurationManifestExportTooLargeException();
     }
 
     [Test]

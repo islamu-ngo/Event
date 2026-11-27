@@ -78,7 +78,7 @@ public sealed class HumanImportPublicationNativeTests(PostgreSqlContainerFixture
             await human.InRequestAsync(async () =>
             {
                 var executor = human.Services.GetRequiredService<IConfigurationInstanceImportExecutor>();
-                var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, default);
+                var snapshot = await executor.ReadSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, default);
                 var manifest = JsonNode.Parse(snapshot.Utf8Json.Span)!;
                 manifest["spec"]!["instance"]!["settings"] = new JsonObject { [key] = true };
                 var created = await executor.CreateAsync(JsonSerializer.SerializeToUtf8Bytes(manifest), default);

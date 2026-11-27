@@ -42,6 +42,8 @@ public static class InstanceAdminLinkRelations
     public const string Unlock = "unlock";
     public const string ExportConfigurationOverrides = "export-configuration-overrides";
     public const string ExportConfigurationPortable = "export-configuration-portable";
+    public const string ExportConfigurationOverridesWithTenants = "export-configuration-overrides-with-tenants";
+    public const string ExportConfigurationPortableWithTenants = "export-configuration-portable-with-tenants";
     public const string CreateConfigurationImportSession =
         "create-configuration-import-session";
     public const string ExportTenantConfigurationPackage =

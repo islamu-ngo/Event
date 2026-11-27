@@ -19,38 +19,31 @@ public sealed class ConfigurationManifestExportService(
 
     public async Task<ConfigurationManifestDownloadResult> DownloadAsync(
         ConfigurationManifestExportView view,
+        ConfigurationManifestExportScope scope,
         CancellationToken cancellationToken = default)
     {
+        string relation = InstanceAdminHal.ExportConfigurationRelation(view, scope);
         HalResourceOfInstanceOverviewDto capabilities =
             await overviewService.GetOverviewAsync(cancellationToken);
-        string relation = RelationFor(view);
 
-        if (!InstanceAdminHal.HasLink(capabilities._links, relation))
+        if (capabilities._links?.TryGetValue(relation, out HalLink? link) != true
+            || !string.Equals(link.Method, "GET", StringComparison.OrdinalIgnoreCase))
         {
             return new ConfigurationManifestDownloadResult(false, capabilities);
         }
 
         bool started = await browserActions.DownloadFileFromUrlAsync(
-            BuildSameOriginBffPath(view),
+            BuildSameOriginBffPath(view, scope),
             cancellationToken);
 
         return new ConfigurationManifestDownloadResult(started, capabilities);
     }
 
-    public static string RelationFor(ConfigurationManifestExportView view) =>
-        view switch
-        {
-            ConfigurationManifestExportView.Overrides =>
-                InstanceAdminLinkRelations.ExportConfigurationOverrides,
-            ConfigurationManifestExportView.Portable =>
-                InstanceAdminLinkRelations.ExportConfigurationPortable,
-            _ => throw new ArgumentOutOfRangeException(nameof(view), view, "Unsupported export view.")
-        };
-
-    private string BuildSameOriginBffPath(ConfigurationManifestExportView view)
+    private string BuildSameOriginBffPath(
+        ConfigurationManifestExportView view, ConfigurationManifestExportScope scope)
     {
         var baseUri = new Uri(navigation.BaseUri, UriKind.Absolute);
         string pathBase = baseUri.AbsolutePath.TrimEnd('/');
-        return $"{pathBase}{ConfigurationManifestExportRoutes.BffExport}?view={view}";
+        return $"{pathBase}{ConfigurationManifestExportRoutes.BffExport}?view={view}&scope={scope}";
     }
 }

@@ -13,6 +13,25 @@ namespace Explore.Persistence.Security;
 public static partial class PostgresConfigurationImportLegalSourceContract
 {
     /// <summary>
+    /// Grants ordinary Global and Runtime logins only portable-source columns. Forced tenant RLS
+    /// remains authoritative for row isolation; the EF projection selects current versions.
+    /// </summary>
+    public static async Task ApplyConfigurationReadPermissionsAsync(
+        ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (!context.Database.IsNpgsql())
+            return;
+        enrollment.Validate();
+        var names = context.GetService<ISqlGenerationHelper>();
+        string logins = $"{names.DelimitIdentifier(enrollment.GlobalLogin)}, {names.DelimitIdentifier(enrollment.RuntimeLogin)}";
+        string grants = string.Join("\n", Relations(context).Select(relation =>
+            $"GRANT SELECT ({string.Join(", ", relation.Columns.Select(property =>
+                Column(context, relation.Type, property)))}) ON TABLE {Table(context, relation.Type)} TO {logins};"));
+        await context.Database.ExecuteSqlRawAsync(grants, ct);
+    }
+
+    /// <summary>
     /// Migration-owned installation. Parent-owned tenant RLS must already protect all three legal source tables.
     /// Does not enroll any Global or Runtime login.
     /// </summary>

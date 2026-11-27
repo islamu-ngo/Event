@@ -16,7 +16,8 @@ public enum HumanAdministratorCommitPurpose
     ConfigurationImport = 5,
     MixedSettingsInstance = 6,
     MixedSettingsTenant = 7,
-    TenantCreation = 8
+    TenantCreation = 8,
+    ConfigurationManifestExport = 9
 }
 
 /// <summary>

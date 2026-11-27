@@ -1,3 +1,4 @@
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
@@ -6,6 +7,7 @@ using Explore.Domain.Enums;
 using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Security;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -25,13 +27,13 @@ public sealed partial class ModerationPolicyPublicationTests
     [Arguments(6)]
     public async Task Tenant_session_preview_keeps_tenant_authority_and_enforces_session_lifetime_through_delivery(int expiryPhase)
     {
-        await using var database = await Database.CreateAsync();
+        await using var database = await Database.CreateAsync(physicalFile: true);
         var foreign = await PublishExportTenantAsync(database);
         await database.PublishAsync(database.Request());
         await DemoteExportAdministratorAsync(database);
-        await using (var changed = database.Context())
+        await using (var seedOwner = database.Context())
+        await using (var changed = DetachedContext(seedOwner, new ExportTenantContext(foreign.TenantId)))
         {
-            changed.TenantContext = new ExportTenantContext(foreign.TenantId);
             changed.ModerationTrustDomainId = database.Scope.TrustDomainId;
             await changed.Set<ModerationPolicyPublicationPlan>().ExecuteDeleteAsync();
         }
@@ -110,24 +112,31 @@ public sealed partial class ModerationPolicyPublicationTests
     [Arguments(true)]
     public async Task Current_artifact_read_participates_in_original_import_transaction_without_starting_another(bool tenant)
     {
-        await using var database = await Database.CreateAsync();
+        await using var database = await Database.CreateAsync(physicalFile: true);
         await database.PublishAsync(database.Request());
         await using var context = database.Context();
         await SeedExportPaidPolicyAsync(context);
         var reader = CurrentExportReader(database, context);
         var unit = new EfCoreUnitOfWork(context);
-        var artifact = await unit.ExecuteSerializableAsync(async token =>
+        var artifact = tenant
+            ? await unit.ExecuteSerializableAsync(token => ReadAsync(context, reader, token))
+            : await WithInstanceReadOwnerAsync(database, context, HumanAdministratorCommitPurpose.ConfigurationImport,
+                (owner, exporter, token) => ReadAsync(owner,
+                    CurrentExportReader(database, owner, exporter, new ExportTenantReadScopes(database, owner, exporter)), token));
+
+        async Task<ReadOnlyMemory<byte>> ReadAsync(ExploreDbContext owner, ConfigurationManifestCurrentStateReader current,
+            CancellationToken token)
         {
-            var original = context.Database.CurrentTransaction!.TransactionId;
+            var original = owner.Database.CurrentTransaction!.TransactionId;
             var bytes = tenant
-                ? (await reader.ReadTenantInCurrentTransactionAsync(database.TenantId,
+                ? (await current.ReadTenantInCurrentTransactionAsync(database.TenantId,
                     ConfigurationManifestExportView.Overrides, token)).Utf8Json
-                : (await reader.ReadInCurrentTransactionAsync(
-                    ConfigurationManifestExportView.Overrides, token)).Utf8Json;
-            await Assert.That(context.Database.CurrentTransaction!.TransactionId).IsEqualTo(original);
-            await Assert.That(context.ChangeTracker.HasChanges()).IsFalse();
+                : (await current.ReadImportSnapshotAsync(ConfigurationManifestExportView.Overrides,
+                    ConfigurationManifestExportScope.InstanceAndTenants, token)).Utf8Json;
+            await Assert.That(owner.Database.CurrentTransaction!.TransactionId).IsEqualTo(original);
+            await Assert.That(owner.ChangeTracker.HasChanges()).IsFalse();
             return bytes;
-        });
+        }
 
         var parser = new ConfigurationImportArtifactParser();
         var definition = tenant

@@ -1,3 +1,4 @@
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
@@ -36,21 +37,49 @@ internal sealed class ConfigurationInstanceImportExecutor(
     }
 
     public async Task<ConfigurationManifestExportResult> ReadSnapshotAsync(
-        ConfigurationManifestExportView view, CancellationToken cancellationToken)
+        ConfigurationManifestExportView view, ConfigurationManifestExportScope snapshotScope,
+        CancellationToken cancellationToken)
     {
-        await using var scope = await CreateOwnerAsync(cancellationToken);
-        var reader = scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>();
-        var lease = scope.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>();
-        var lifetime = lease.HumanLifetime
-            ?? throw new UnauthorizedAccessException("Instance snapshots require the original authenticated credential lifetime.");
-        var result = await scope.ServiceProvider.GetRequiredService<IUnitOfWork>()
-            .ExecuteSerializableAsync(
-                token => reader.ReadImportSnapshotAsync(view, null, token), cancellationToken);
-        lease.RequireOriginalCredential(scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext
-            ?? throw new UnauthorizedAccessException("The original authenticated request is missing."), lifetime);
-        if (!lifetime.IsValidAt(scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow()))
-            throw new UnauthorizedAccessException("The original authenticated credential expired before snapshot disclosure.");
+        var requests = provider.GetRequiredService<IHttpContextAccessor>();
+        var clock = provider.GetRequiredService<TimeProvider>();
+        var request = requests.HttpContext
+            ?? throw new UnauthorizedAccessException("Instance snapshots require a human request.");
+        var principal = request.User;
+        var identities = principal.Identities.ToArray();
+        var account = principal.GetProviderIdentity()?.AccountKey
+            ?? throw new UnauthorizedAccessException("Instance snapshots require an authenticated provider account.");
+        HumanAuthenticationLifetime lifetime;
+        ConfigurationManifestExportResult result;
+        await using (var scope = await CreateOwnerAsync(cancellationToken, RequireOriginalRequest))
+        {
+            var reader = scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>();
+            var lease = scope.ServiceProvider.GetRequiredService<ExploreDbContextExecutionLease>();
+            lifetime = lease.HumanLifetime
+                ?? throw new UnauthorizedAccessException("Instance snapshots require the original authenticated credential lifetime.");
+            RequireLiveCredential();
+            result = await scope.ServiceProvider.GetRequiredService<IUnitOfWork>()
+                .ExecuteSerializableAsync(
+                    token => reader.ReadImportSnapshotAsync(view, snapshotScope, token), cancellationToken);
+            lease.RequireOriginalCredential(requests.HttpContext, lifetime);
+            RequireLiveCredential();
+        }
+        RequireLiveCredential();
         return result;
+
+        void RequireOriginalRequest()
+        {
+            if (!ReferenceEquals(requests.HttpContext, request) || !ReferenceEquals(request.User, principal)
+                || !principal.Identities.SequenceEqual(identities, ReferenceEqualityComparer.Instance)
+                || principal.GetProviderIdentity()?.AccountKey != account)
+                throw new UnauthorizedAccessException("The original snapshot credential changed.");
+        }
+
+        void RequireLiveCredential()
+        {
+            RequireOriginalRequest();
+            if (lifetime.AccountKey != account || !lifetime.IsValidAt(clock.GetUtcNow()))
+                throw new UnauthorizedAccessException("Instance snapshots require the original live credential.");
+        }
     }
 
     public async Task<ConfigurationImportPreviewResult> PreviewAsync(
@@ -103,17 +132,21 @@ internal sealed class ConfigurationInstanceImportExecutor(
                 operationId, ConfigurationImportTarget.ForInstance(), cancellationToken);
     }
 
-    private async ValueTask<AsyncServiceScope> CreateOwnerAsync(CancellationToken cancellationToken)
+    private async ValueTask<AsyncServiceScope> CreateOwnerAsync(
+        CancellationToken cancellationToken, Action? requireOriginalRequest = null)
     {
         var subject = await PolicyMutationExecutionScopeFactory.ResolveSubjectAsync(provider, cancellationToken);
+        requireOriginalRequest?.Invoke();
         var lifetime = subject is null ? null
             : await PolicyMutationExecutionScopeFactory.ResolveLifetimeAsync(provider, cancellationToken);
+        requireOriginalRequest?.Invoke();
         var scope = scopes.CreateAsyncScope();
         ExploreDbContext? context = null;
         bool captured = false;
         try
         {
             context = await globalFactory.CreateDbContextAsync(cancellationToken);
+            requireOriginalRequest?.Invoke();
             context.BindConfigurationInstanceImportOwner();
             context.CurrentUserService = provider.GetService<ICurrentUserService>();
             if (provider.GetService<ITenantContextAccessor>()?.TenantId is { } tenantId)

@@ -182,4 +182,7 @@ public static class TenantFilterBypassReasons
 
     public const string RegistrationFormTemplateSourceVersion =
         "Registration form authoring reads one shared template source version across tenants using the exact event, form, and version id tuple.";
+
+    public const string ConfigurationManifestPackageExport =
+        "Configuration package export reads one exact tenant's status, the caller's tenant-admin grant and the tenant's moderation definition on a tenantless Global context.";
 }

@@ -16,6 +16,7 @@ public class TenantSettingRepository : ITenantSettingRepository
     private readonly ExploreDbContext _dbContext;
     private readonly ISettingMutationLock _mutationLock;
     private readonly HumanSettingsDataBoundary? _humanBoundary;
+    private readonly PostgresNativeQueueEnrollment? _enrollment;
 
     private TenantSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock)
     {
@@ -28,11 +29,12 @@ public class TenantSettingRepository : ITenantSettingRepository
         ExploreDbContext context, ISettingMutationLock mutationLock) => new(context, mutationLock);
 
     public TenantSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock,
-        HumanSettingsDataBoundary humanBoundary)
+        HumanSettingsDataBoundary humanBoundary, PostgresNativeQueueEnrollment? enrollment = null)
     {
         _dbContext = dbContext;
         _mutationLock = mutationLock;
         _humanBoundary = humanBoundary;
+        _enrollment = enrollment;
     }
 
     public async Task<TenantSetting?> GetByTenantAndKey(
@@ -142,6 +144,28 @@ public class TenantSettingRepository : ITenantSettingRepository
             .AsNoTracking()
             .Where(setting => setting.TenantId == tenantId && keys.Contains(setting.SettingKey))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TenantSetting>> GetByTenantAndKeysForConfigurationExportAsync(
+        Guid tenantId,
+        IReadOnlyCollection<string> keys,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        if (keys.Count == 0)
+            return [];
+        if (!_dbContext.Database.IsNpgsql() || _dbContext.IsConfigurationInstanceImportOwner)
+            return await GetByTenantAndKeys(tenantId, keys, cancellationToken);
+
+        // PostgreSQL exports read through the enrolled ordinary-settings contract, which
+        // only exposes the context's bound tenant; a different requested tenant fails closed.
+        if (_dbContext.TenantFilterTenantId != tenantId)
+            throw new UnauthorizedAccessException("configuration_export_tenant_scope_mismatch");
+        var image = await PostgresOrdinarySettingsContract.ReadHierarchyAsync(
+            _dbContext, _enrollment
+                ?? throw new UnauthorizedAccessException("Tenant configuration reads require ordinary settings enrollment."),
+            tenantId, keys, cancellationToken);
+        return image.Tenant;
     }
 
     public Task<List<TenantSetting>> GetByKeyAcrossTenants(

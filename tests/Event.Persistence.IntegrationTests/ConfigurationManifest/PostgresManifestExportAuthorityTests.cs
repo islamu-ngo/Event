@@ -8,6 +8,7 @@ using Event.Persistence.IntegrationTests.TenantIsolation;
 using Explore.API.Extensions;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
@@ -21,6 +22,7 @@ using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.PaidEventPolicies;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents;
@@ -32,11 +34,15 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Entities;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Security;
+using Explore.Persistence.Services;
 using Explore.ServiceDefaults.Secrets;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -53,6 +59,138 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
     private const string ExcludedKey = "manifest.export.non_catalog";
     private const string TenantASlug = "z-export-tenant-a";
     private const string TenantBSlug = "a-export-tenant-b";
+
+    [Test]
+    public async Task OrdinaryGlobalLegalSourceColumnsRetainTenantIsolationAndExcludeAuditFields()
+    {
+        await fixture.ResetAsync();
+        var token = TestContext.Current!.Execution.CancellationToken;
+        Guid tenantId = Guid.CreateVersion7();
+        var instancePolicy = PaidEventPolicyVersion.CreateDefaultInstance();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.BindTenantLease();
+            seed.PaidEventPolicyVersions.Add(instancePolicy);
+            seed.Tenants.Add(new Tenant
+            {
+                Id = tenantId, Slug = $"legal-source-{tenantId:N}", FullName = "Legal source tenant",
+                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            });
+            seed.LegalDocuments.AddRange(
+                LegalDocument.CreateImportedDraft(LegalDocumentScope.Instance, null,
+                    LegalDocumentKind.TermsOfService, LegalDocumentAudience.Public,
+                    [LegalDocumentLocalizedSource.Create("en", "Instance terms", "Instance source", "Current instance source.")],
+                    null, "global-source-permissions", false, DateTime.UtcNow),
+                LegalDocument.CreateImportedDraft(LegalDocumentScope.Tenant, tenantId,
+                    LegalDocumentKind.TenantTerms, LegalDocumentAudience.Public,
+                    [LegalDocumentLocalizedSource.Create("en", "Tenant terms", "Tenant source", "Private tenant marker.")],
+                    null, "tenant-source-permissions", false, DateTime.UtcNow));
+            await seed.SaveChangesAsync(token);
+        }
+
+        var options = fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Global);
+        await using var context = await new GlobalExploreDbContextFactory(options).CreateDbContextAsync(token);
+        await Assert.That(await CurrentLoginAsync(context)).IsEqualTo(options.Username);
+        var reader = new ConfigurationImportLegalSourceReader(context);
+        var sources = await reader.ReadAsync(LegalDocumentScope.Instance, null, token);
+        await Assert.That(sources.Single().Localizations.Single().Markdown).IsEqualTo("Current instance source.");
+        await Assert.That(await reader.ReadAsync(LegalDocumentScope.Tenant, tenantId, token)).IsEmpty();
+        await Assert.That(context.TenantFilterTenantId).IsNull();
+        await Assert.That(context.IsTenantFilterBypassed).IsFalse();
+        await Assert.That(context.IsConfigurationInstanceImportOwner).IsFalse();
+        var exportedPolicy = await new PaidEventPolicyRepository(context)
+            .GetActiveForConfigurationExportAsync(null, token);
+        await Assert.That(exportedPolicy!.Id).IsEqualTo(instancePolicy.Id);
+        await Assert.That(exportedPolicy.CreatedBy).IsNull();
+        await Assert.That(context.ChangeTracker.Entries<PaidEventPolicyVersion>()).IsEmpty();
+
+        var entity = context.Model.FindEntityType(typeof(LegalDocument))!;
+        var sqlNames = context.GetService<ISqlGenerationHelper>();
+        string table = sqlNames
+            .DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+        string auditColumn = sqlNames.DelimitIdentifier(entity.FindProperty(nameof(LegalDocument.CreatedBy))!
+            .GetColumnName(StoreObjectIdentifier.Table(entity.GetTableName()!, entity.GetSchema()))!);
+        var denied = await Assert.ThrowsAsync<PostgresException>(() => context.Database
+            .SqlQueryRaw<Guid?>($"SELECT {auditColumn} AS \"Value\" FROM {table}").ToArrayAsync(token));
+        await Assert.That(denied!.SqlState).IsEqualTo("42501");
+        var policyEntity = context.Model.FindEntityType(typeof(PaidEventPolicyVersion))!;
+        string policyTable = sqlNames
+            .DelimitIdentifier(policyEntity.GetTableName()!, policyEntity.GetSchema());
+        string policyAuditColumn = sqlNames.DelimitIdentifier(policyEntity.FindProperty(
+                nameof(PaidEventPolicyVersion.CreatedBy))!.GetColumnName(StoreObjectIdentifier.Table(
+                policyEntity.GetTableName()!, policyEntity.GetSchema()))!);
+        var policyDenied = await Assert.ThrowsAsync<PostgresException>(() => context.Database
+            .SqlQueryRaw<Guid?>($"SELECT {policyAuditColumn} AS \"Value\" FROM {policyTable}").ToArrayAsync(token));
+        await Assert.That(policyDenied!.SqlState).IsEqualTo("42501");
+    }
+
+    [Test]
+    [Arguments(ConfigurationManifestExportView.Overrides)]
+    [Arguments(ConfigurationManifestExportView.Portable)]
+    public async Task DefaultInstanceExportSucceedsForPlatformAdministratorBeforeAnyTenantExists(
+        ConfigurationManifestExportView view)
+    {
+        await fixture.ResetAsync();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            await Assert.That(await seed.Tenants.IgnoreQueryFilters().AnyAsync()).IsFalse();
+            seed.BindTenantLease();
+            var setting = await seed.SystemSettings.SingleOrDefaultAsync(
+                row => row.SettingKey == EventSettingDefinitions.RequireApproval.Key);
+            if (setting is null)
+            {
+                setting = new SystemSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = EventSettingDefinitions.RequireApproval.Key,
+                    Value = "false",
+                    CreatedAt = DateTime.UtcNow
+                };
+                seed.SystemSettings.Add(setting);
+            }
+            setting.Value = "false";
+            setting.ValueType = EventSettingDefinitions.RequireApproval.ValueType;
+            if (!await seed.PaidEventPolicyVersions.AnyAsync(policy => policy.TenantId == null && policy.IsActive))
+                seed.PaidEventPolicyVersions.Add(PaidEventPolicyVersion.CreateDefaultInstance());
+            await seed.SaveChangesAsync();
+        }
+
+        AuthenticatedSettingsFixture.SanitizedRequestFailure? failure = null;
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+            () => fixture.CreateTenantFilteredDbContext(), fixture, deploymentMode: DeploymentMode.MultiTenant,
+            createDefaultTenant: false, requestFailureObserver: observed => failure = observed);
+        await using (var state = fixture.CreateDbContext())
+        {
+            await Assert.That(await state.Tenants.IgnoreQueryFilters().AnyAsync()).IsFalse();
+            await Assert.That(await state.PlatformUserRoles.AnyAsync(row =>
+                row.UserId == authenticated.ActorId
+                && row.Role.RoleScopeId == (int)RoleScopeEnum.Platform
+                && row.Role.MasterCode == "platform.admin")).IsTrue();
+        }
+
+        using var response = await authenticated.ExportConfigurationManifestViaApiAsync(
+            view, TestContext.Current!.Execution.CancellationToken);
+        await Assert.That(response.StatusCode).IsEqualTo(System.Net.HttpStatusCode.OK)
+            .Because(failure is null ? "The authenticated export must return its artifact."
+                : $"Types: {string.Join(", ", failure.ExceptionTypes)}; "
+                    + $"SQL states: {string.Join(", ", failure.SqlStates)}; "
+                    + $"Methods: {string.Join(", ", failure.Methods.Where(method =>
+                        method.StartsWith("Explore.", StringComparison.Ordinal)).Take(8))}");
+        var manifest = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(
+            await response.Content.ReadAsByteArrayAsync());
+
+        await Assert.That(manifest.Metadata.Export!.AuthorityScope)
+            .IsEqualTo(ConfigurationManifestExportMetadataValues.InstanceAuthorityScope);
+        await Assert.That(manifest.Metadata.Export!.EffectiveValuesFlattened)
+            .IsEqualTo(view == ConfigurationManifestExportView.Portable);
+        await Assert.That(manifest.Spec.Tenants).IsEmpty();
+        await Assert.That(manifest.Spec.Instance.Settings[EventSettingDefinitions.RequireApproval.Key].GetBoolean())
+            .IsFalse();
+        await Assert.That(manifest.Spec.Instance.Documents.ContainsKey(
+            ConfigurationManifestDocumentKeys.InstancePaidEventPolicy)).IsTrue();
+        await using var after = fixture.CreateDbContext();
+        await Assert.That(await after.Tenants.IgnoreQueryFilters().AnyAsync()).IsFalse();
+    }
 
     [Test]
     [Arguments("resource")]
@@ -156,32 +294,35 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
     public async Task TrustedReaderExportsExactSelectedTenantOverridesFromAmbientTenantA(
         ConfigurationManifestExportView view, bool singleTenant)
     {
-        await using var rows =
-            await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.CreateAsync(fixture);
-        await SeedExportStateAsync(rows);
-        await using var authority =
-            await PostgresAuthenticationLookupAuthorityTests.AuthenticationGlobalAuthority.CreateAsync(fixture);
-        await using var global = await authority.Factory.CreateDbContextAsync();
-        var globalConnection = new NpgsqlConnectionStringBuilder(global.Database.GetConnectionString());
-        await using var request = rows.Context(rows.A);
-        await rows.AssertOrdinaryRoleAsync(request);
-        string runtimeLogin = await CurrentLoginAsync(request);
-        await SetReadPermissionsAsync(rows.Schema, runtimeLogin, globalConnection.Username!, grant: true);
-        try
+        await fixture.ResetAsync();
+        await using var authenticated = await AuthenticatedSettingsFixture.CreateAsync(
+            () => fixture.CreateTenantFilteredDbContext(), fixture, deploymentMode: DeploymentMode.MultiTenant);
+        Guid tenantA = PlatformDefaults.DefaultTenantId;
+        Guid tenantB = Guid.CreateVersion7();
+        Guid inactiveTenant = Guid.CreateVersion7();
+        await using (var seed = fixture.CreateDbContext())
         {
-            await using var services = CreateServices(rows.RuntimeOptions, globalConnection);
-            await using var scope = services.CreateAsyncScope();
-            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(rows.A);
-            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            await rows.AssertOrdinaryRoleAsync(context);
-            await Assert.That(await context.TenantSettingOverrides.IgnoreQueryFilters()
-                .AnyAsync(row => row.TenantId == rows.B)).IsFalse();
+            seed.BindTenantLease();
+            seed.Tenants.AddRange(
+                new Tenant { Id = tenantB, Slug = TenantBSlug, FullName = "Tenant B",
+                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! },
+                new Tenant { Id = inactiveTenant, Slug = $"inactive-{inactiveTenant:N}", FullName = "Inactive tenant",
+                    TenantStatusId = (int)TenantStatusEnum.Suspended, TenantStatus = null! });
+            await seed.SaveChangesAsync();
+        }
+        await SeedExportStateAsync(tenantA, tenantB, inactiveTenant);
+        await authenticated.RunAsync(tenantA, async session =>
+        {
+            var context = session.Context;
+            await PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.AssertOrdinaryRoleAsync(
+                context, fixture.GetNativeQueueOptions(PrimaryDatabaseRole.Runtime).Username);
+            await AssertOriginalTenantReadAsync();
 
-            // This is the trusted reader seam, not an HTTP authorization assertion.
-            var reader = scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>();
+            var reader = session.Services.GetRequiredService<ConfigurationManifestCurrentStateReader>();
             var payload = singleTenant
-                ? (await reader.ReadTenantAsync(rows.B, view, CancellationToken.None)).Utf8Json
-                : (await reader.ReadAsync(view, CancellationToken.None)).Utf8Json;
+                ? (await reader.ReadTenantAsync(tenantB, view, CancellationToken.None)).Utf8Json
+                : (await session.Services.GetRequiredService<IConfigurationManifestExportExecutor>()
+                    .ExportAsync(view, ConfigurationManifestExportScope.InstanceAndTenants, CancellationToken.None)).Utf8Json;
 
             using JsonDocument exported = JsonDocument.Parse(payload);
             JsonElement spec = exported.RootElement.GetProperty("spec");
@@ -218,17 +359,33 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
                 await Assert.That(settings.EnumerateObject().All(
                     entry => ConfigurationManifestCatalog.TryGetTenantSetting(entry.Name, out _))).IsTrue();
             }
-            await Assert.That(context.TenantFilterTenantId).IsEqualTo((Guid?)rows.A);
+            await Assert.That(context.TenantFilterTenantId).IsEqualTo((Guid?)tenantA);
             await Assert.That(context.IsTenantFilterBypassed).IsFalse();
-            await Assert.That(scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().TenantId)
-                .IsEqualTo((Guid?)rows.A);
-            await Assert.That(await context.TenantSettingOverrides.IgnoreQueryFilters()
-                .AnyAsync(row => row.TenantId == rows.B)).IsFalse();
-        }
-        finally
-        {
-            await SetReadPermissionsAsync(rows.Schema, runtimeLogin, globalConnection.Username!, grant: false);
-        }
+            await Assert.That(session.Services.GetRequiredService<ITenantContextAccessor>().TenantId)
+                .IsEqualTo((Guid?)tenantA);
+            await AssertOriginalTenantReadAsync();
+            await using var deniedContext = await session.Services
+                .GetRequiredService<ITenantExploreDbContextFactory>().CreateDbContextAsync(tenantA);
+            var sourceNames = new HumanPrincipalSourceSql(deniedContext);
+            await deniedContext.Database.OpenConnectionAsync();
+            await using var payloadProbe = deniedContext.Database.GetDbConnection().CreateCommand();
+            payloadProbe.CommandText =
+                $"SELECT {sourceNames.Column(typeof(TenantSettingsDocument), nameof(TenantSettingsDocument.PayloadJson))} " +
+                $"FROM {sourceNames.Table(typeof(TenantSettingsDocument))} WHERE false";
+            var deniedPayload = await Assert.ThrowsAsync<PostgresException>(() => payloadProbe.ExecuteScalarAsync());
+            await Assert.That(deniedPayload!.SqlState).IsEqualTo("42501");
+            return true;
+
+            async Task AssertOriginalTenantReadAsync()
+            {
+                var image = await PostgresOrdinarySettingsContract.ReadHierarchyAsync(
+                    context, session.Services.GetRequiredService<PostgresNativeQueueEnrollment>(),
+                    tenantA, [EventSettingDefinitions.RequireApproval.Key], CancellationToken.None);
+                await Assert.That(image.Tenant.Any(row => row.TenantId == tenantB)).IsFalse();
+                await Assert.That(image.Tenant.Single(row =>
+                    row.SettingKey == EventSettingDefinitions.RequireApproval.Key).Value).IsEqualTo("false");
+            }
+        });
     }
 
     [Test]
@@ -265,7 +422,8 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
             {
                 await using var transaction = await context.Database.BeginTransactionAsync(
                     System.Data.IsolationLevel.Serializable);
-                var result = await executor.ReadSnapshotAsync(view, default);
+                var result = await executor.ReadSnapshotAsync(
+                    view, ConfigurationManifestExportScope.InstanceAndTenants, default);
 
                 using JsonDocument snapshot = JsonDocument.Parse(result.Utf8Json);
                 JsonElement[] tenants = snapshot.RootElement.GetProperty("spec")
@@ -489,7 +647,8 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
             var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             await rows.AssertOrdinaryRoleAsync(context);
             var executor = scope.ServiceProvider.GetRequiredService<IConfigurationInstanceImportExecutor>();
-            var snapshot = await executor.ReadSnapshotAsync(exportView, default);
+            var snapshot = await executor.ReadSnapshotAsync(
+                exportView, ConfigurationManifestExportScope.InstanceAndTenants, default);
             if (originalFederation is not null)
                 await FederationManifestStorageSnapshot.AssertPublicExclusionAsync(snapshot.Utf8Json);
             var sessions = scope.ServiceProvider.GetRequiredService<ConfigurationImportSessionApplicationService>();
@@ -999,8 +1158,11 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
         await command.ExecuteNonQueryAsync();
     }
 
-    private async Task SeedExportStateAsync(
-        PostgresAuthenticationLookupAuthorityTests.AuthenticationRows rows)
+    private Task SeedExportStateAsync(
+        PostgresAuthenticationLookupAuthorityTests.AuthenticationRows rows) =>
+        SeedExportStateAsync(rows.A, rows.B, rows.Inactive);
+
+    private async Task SeedExportStateAsync(Guid tenantA, Guid tenantB, Guid inactiveTenant)
     {
         string key = EventSettingDefinitions.RequireApproval.Key;
         await Assert.That(ConfigurationManifestCatalog.TryGetInstanceSetting(key, out _)).IsTrue();
@@ -1008,8 +1170,9 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
         await Assert.That(ConfigurationManifestCatalog.TryGetInstanceSetting(ExcludedKey, out _)).IsFalse();
         await Assert.That(ConfigurationManifestCatalog.TryGetTenantSetting(ExcludedKey, out _)).IsFalse();
         await using var seed = fixture.CreateDbContext();
-        Tenant a = await seed.Tenants.SingleAsync(tenant => tenant.Id == rows.A);
-        Tenant b = await seed.Tenants.SingleAsync(tenant => tenant.Id == rows.B);
+        seed.BindTenantLease();
+        Tenant a = await seed.Tenants.SingleAsync(tenant => tenant.Id == tenantA);
+        Tenant b = await seed.Tenants.SingleAsync(tenant => tenant.Id == tenantB);
         a.Slug = TenantASlug;
         b.Slug = TenantBSlug;
         seed.Add(PaidEventPolicyVersion.CreateDefaultInstance());
@@ -1032,7 +1195,7 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
             setting.ValueType = EventSettingDefinitions.RequireApproval.ValueType;
             setting.IsLocked = false;
         }
-        foreach (Guid tenantId in new[] { rows.A, rows.B, rows.Inactive })
+        foreach (Guid tenantId in new[] { tenantA, tenantB, inactiveTenant })
         {
             seed.TenantSettingOverrides.Add(new TenantSetting
             {
@@ -1040,7 +1203,7 @@ public sealed class PostgresManifestExportAuthorityTests(PostgreSqlContainerFixt
                 TenantId = tenantId,
                 Tenant = null!,
                 SettingKey = key,
-                Value = JsonSerializer.Serialize(tenantId != rows.A),
+                Value = JsonSerializer.Serialize(tenantId != tenantA),
                 CreatedAt = PostgresAuthenticationLookupAuthorityTests.AuthenticationRows.Now
             });
             seed.TenantSettingOverrides.Add(new TenantSetting

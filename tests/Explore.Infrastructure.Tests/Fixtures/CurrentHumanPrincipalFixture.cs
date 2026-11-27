@@ -10,6 +10,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Features.ConfigurationManifest.Moderation;
 using Explore.Application.Features.Users.Handlers.Queries;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Telemetry;
@@ -215,9 +216,18 @@ internal sealed class CurrentHumanPrincipalFixture : IAsyncDisposable
             services.AddScoped<IConfigurationInstanceImportExecutor>(provider =>
                 new ConfigurationInstanceImportExecutor(provider, executionScopes,
                     provider.GetRequiredService<IGlobalExploreDbContextFactory>()));
+            services.AddScoped<IConfigurationManifestExportExecutor>(provider =>
+                new ConfigurationManifestExportExecutor(provider, executionScopes,
+                    provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                    provider.GetRequiredService<IHttpContextAccessor>(),
+                    provider.GetRequiredService<TimeProvider>()));
             services.AddScoped<IConfigurationManifestTenantReadScopeFactory>(provider =>
                 new ConfigurationManifestTenantReadScopeFactory(provider, executionScopes,
                     provider.GetRequiredService<ITenantExploreDbContextFactory>()));
+            services.AddScoped<IConfigurationManifestPackageModerationReader>(provider =>
+                new ConfigurationManifestPackageModerationReader(executionScopes,
+                    provider.GetRequiredService<IGlobalExploreDbContextFactory>(),
+                    provider.GetRequiredService<IConfigurationManifestPackageAuthority>()));
             services.RemoveAll<ExploreDbContext>();
             // The parent borrows externally; native child scopes capture and dispose only their selected owner.
             services.AddSingleton(borrowedContext);

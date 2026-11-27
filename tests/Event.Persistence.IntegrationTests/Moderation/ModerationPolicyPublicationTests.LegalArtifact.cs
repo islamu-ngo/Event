@@ -16,19 +16,19 @@ public sealed partial class ModerationPolicyPublicationTests
     [Test]
     public async Task Actual_instance_artifact_exports_instance_and_each_authorized_tenant_legal_content_without_impersonation()
     {
-        await using var database = await Database.CreateAsync();
+        await using var database = await Database.CreateAsync(physicalFile: true);
         var foreign = await PublishExportTenantAsync(database);
         await using var context = database.Context();
         var instance = LegalDocument.CreateImportedDraft(LegalDocumentScope.Instance, null,
             LegalDocumentKind.TermsOfService, LegalDocumentAudience.Public,
             [LegalDocumentLocalizedSource.Create("en", "Instance terms", "Instance meaning", "Instance content.")],
             null, "private-instance-origin", false, Now.UtcDateTime);
-        context.LegalDocuments.AddRange(instance, LegalImportDraft(database.TenantId), LegalImportDraft(foreign.TenantId));
+        context.LegalDocuments.AddRange(instance, LegalImportDraft(database.TenantId));
         await context.SaveChangesAsync();
+        await SeedForeignLegalDraftAsync(context, foreign.TenantId);
         await SeedExportPaidPolicyAsync(context);
         var originalTrustDomain = context.ModerationTrustDomainId;
-        var artifact = await CurrentExportReader(database, context).ReadAsync(
-            ConfigurationManifestExportView.Overrides, CancellationToken.None);
+        var artifact = await ReadCombinedManifestAsync(database, context);
         var manifest = ConfigurationPortabilityJsonCodec.ParseConfigurationManifest(artifact.Utf8Json);
         await Assert.That(manifest.Spec.Instance.LegalDocuments["TermsOfService"].Localizations.Single().Markdown)
             .IsEqualTo("Instance content.");
@@ -194,7 +194,7 @@ public sealed partial class ModerationPolicyPublicationTests
     [Test]
     public async Task Current_tenant_artifact_contains_unpublished_legal_meaning_without_borrowing_publication_authority()
     {
-        await using var database = await Database.CreateAsync();
+        await using var database = await Database.CreateAsync(physicalFile: true);
         var document = LegalImportDraft(database.TenantId);
         await using (var writer = database.Context())
         {

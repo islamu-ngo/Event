@@ -678,7 +678,8 @@ public sealed class ConfigurationImportApplyService(
                 authorized,
                 verificationRequest,
                 cancellationToken,
-                inCurrentTransaction: true);
+                inCurrentTransaction: true,
+                retainedInstanceScope: preparation.InstanceSnapshotScope);
         ConfigurationImportPreview verification =
             previewComposer.Compose(verificationPreparation.Input);
         if (preparation.Input.ModerationPreview is { } nativePreview)

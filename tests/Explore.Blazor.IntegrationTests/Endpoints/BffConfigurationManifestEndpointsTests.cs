@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using Explore.Blazor.Client.Clients;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -15,27 +17,36 @@ public sealed class BffConfigurationManifestEndpointsTests
     private const int MaximumBytes = 4 * 1024 * 1024;
 
     [Test]
-    [Arguments("Overrides", "export-configuration-overrides", "configuration-manifest-overrides.json")]
-    [Arguments("Portable", "export-configuration-portable", "configuration-manifest-portable.json")]
+    [Arguments("Overrides", "Instance", "export-configuration-overrides", "configuration-manifest-overrides.json")]
+    [Arguments("Portable", "Instance", "export-configuration-portable", "configuration-manifest-portable.json")]
+    [Arguments("Overrides", "InstanceAndTenants", "export-configuration-overrides-with-tenants", "configuration-manifest-overrides.json")]
+    [Arguments("Portable", "InstanceAndTenants", "export-configuration-portable-with-tenants", "configuration-manifest-portable.json")]
     public async Task Download_UsesFixedApiRouteAndReturnsValidatedNoStoreFile(
         string view,
+        string scope,
         string relation,
         string fileName)
     {
         var paths = new List<string>();
-        var payload = Encoding.UTF8.GetBytes("""{"kind":"ConfigurationManifest"}""");
-
         await using var factory = CreateFactory((request, _) =>
         {
             paths.Add(request.RequestUri?.PathAndQuery ?? string.Empty);
-            return Task.FromResult(
-                request.RequestUri?.AbsolutePath == ApiOverviewRoute
-                    ? OverviewResponse(relation)
-                    : FileResponse(payload, MediaType, fileName));
+            if (request.RequestUri?.AbsolutePath == ApiOverviewRoute)
+                return Task.FromResult(OverviewResponse(relation));
+
+            var query = QueryHelpers.ParseQuery(request.RequestUri!.Query);
+            string forwardedScope = query.TryGetValue("scope", out var value)
+                ? value.ToString() : "Instance";
+            byte[] payload = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                kind = "ConfigurationManifest",
+                metadata = new { export = new { authorityScope = forwardedScope } }
+            });
+            return Task.FromResult(FileResponse(payload, MediaType, fileName));
         });
         using var client = CreateClient(factory);
         using var request = AuthenticatedRequest(
-            $"{BffRoute}?view={view}&apiUrl=https://attacker.example/export&access_token=browser-secret");
+            $"{BffRoute}?view={view}&scope={scope}&apiUrl=https://attacker.example/export&access_token=browser-secret");
 
         using var response = await client.SendAsync(request);
         var body = await response.Content.ReadAsByteArrayAsync();
@@ -44,13 +55,63 @@ public sealed class BffConfigurationManifestEndpointsTests
         await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo(MediaType);
         await Assert.That(response.Content.Headers.ContentDisposition?.FileNameStar).IsEqualTo(fileName);
         await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
-        await Assert.That(body).IsEquivalentTo(payload);
+        using JsonDocument artifact = JsonDocument.Parse(body);
+        await Assert.That(artifact.RootElement.GetProperty("metadata")
+            .GetProperty("export").GetProperty("authorityScope").GetString()).IsEqualTo(scope);
         await Assert.That(Encoding.UTF8.GetString(body)).DoesNotContain("browser-secret");
         await Assert.That(paths).IsEquivalentTo(
         [
             ApiOverviewRoute,
-            $"{ApiExportRoute}?view={view}"
+            $"{ApiExportRoute}?view={view}&scope={scope}"
         ]);
+    }
+
+    [Test]
+    [Arguments("Overrides", "export-configuration-overrides")]
+    [Arguments("Portable", "export-configuration-portable")]
+    public async Task Download_CombinedScopeCannotBorrowInstanceOnlyCapability(
+        string view, string instanceRelation)
+    {
+        var exportCalls = 0;
+        await using var factory = CreateFactory((request, _) =>
+        {
+            if (request.RequestUri?.AbsolutePath == ApiOverviewRoute)
+                return Task.FromResult(OverviewResponse(instanceRelation));
+
+            exportCalls++;
+            return Task.FromResult(FileResponse([], MediaType,
+                $"configuration-manifest-{view.ToLowerInvariant()}.json"));
+        });
+        using var client = CreateClient(factory);
+        using var request = AuthenticatedRequest(
+            $"{BffRoute}?view={view}&scope=InstanceAndTenants");
+
+        using var response = await client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(exportCalls).IsEqualTo(0);
+        await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+    }
+
+    [Test]
+    [Arguments("-1")]
+    [Arguments("99")]
+    [Arguments("UnknownScope")]
+    public async Task Download_UnsupportedScopeFailsBeforeCallingDownstream(string scope)
+    {
+        var downstreamCalls = 0;
+        await using var factory = CreateFactory((_, _) =>
+        {
+            downstreamCalls++;
+            return Task.FromResult(OverviewResponse("export-configuration-overrides"));
+        });
+        using var client = CreateClient(factory);
+        using var request = AuthenticatedRequest($"{BffRoute}?view=Overrides&scope={scope}");
+
+        using var response = await client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(downstreamCalls).IsEqualTo(0);
     }
 
     [Test]
@@ -164,6 +225,7 @@ public sealed class BffConfigurationManifestEndpointsTests
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions
         {
+            BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false,
             HandleCookies = true
         });

@@ -639,7 +639,7 @@ public sealed class VisitorAccessSettingsWriterTests
             .HttpContext ?? throw new InvalidOperationException("The original authenticated request is required."));
         var snapshot = await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteSerializableAsync(token =>
             scope.ServiceProvider.GetRequiredService<ConfigurationManifestCurrentStateReader>()
-                .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, null, token));
+                .ReadImportSnapshotAsync(ConfigurationManifestExportView.Portable, ConfigurationManifestExportScope.InstanceAndTenants, token));
         var manifest = JsonNode.Parse(snapshot.Utf8Json.Span)!;
         manifest["spec"]!["instance"]!["settings"]![GovernanceSettingKeys.PublicExperience.EventCatalogLabel] =
             "Manifest events";

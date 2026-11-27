@@ -34,6 +34,55 @@ public sealed class PaidEventPolicyRepository(ExploreDbContext dbContext) : IPai
             .IgnoreAllFilters(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .SingleOrDefaultAsync(policy => policy.TenantId == tenantId && policy.IsActive, cancellationToken);
 
+    public async Task<PaidEventPolicyVersion?> GetActiveForConfigurationExportAsync(
+        Guid? tenantId, CancellationToken cancellationToken)
+    {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("A tenant cannot be empty.", nameof(tenantId));
+        if (dbContext.IsConfigurationInstanceImportOwner
+            && ConfigurationImportRepositoryNativeOperations.For(dbContext) is { } native)
+            return await native.ReadActivePolicyAsync(tenantId, cancellationToken);
+
+        var source = await dbContext.PaidEventPolicyVersions
+            .IgnoreAllFilters(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+            .AsNoTracking()
+            .IgnoreAutoIncludes()
+            .Where(policy => policy.TenantId == tenantId && policy.IsActive)
+            .Select(policy => new
+            {
+                policy.Id, policy.TenantId, policy.VersionNumber, policy.IsPaymentsEnabled,
+                policy.RequiresLocalVerification, policy.DefaultCurrencyCode,
+                policy.RequiresFirstPaidEventReview, policy.FarFutureReviewThresholdDays,
+                Kinds = EF.Property<IEnumerable<PaidEventPolicyAllowedOrganizerKind>>(
+                        policy, "AllowedOrganizerKindRows")
+                    .OrderBy(row => row.Ordinal).Select(row => row.ActorTypeId).ToArray(),
+                Currencies = EF.Property<IEnumerable<PaidEventPolicyAllowedCurrency>>(
+                        policy, "AllowedCurrencyRows")
+                    .OrderBy(row => row.Ordinal).Select(row => row.CurrencyCode).ToArray(),
+                Protections = EF.Property<IEnumerable<PaidEventPolicyRefundProtection>>(
+                        policy, "RefundProtectionRows")
+                    .OrderBy(row => row.Ordinal).Select(row => row.RefundProtectionId).ToArray(),
+                Risks = EF.Property<IEnumerable<PaidEventPolicyCurrencyRiskLimitRow>>(
+                        policy, "CurrencyRiskLimitRows")
+                    .OrderBy(row => row.Ordinal).Select(row => new
+                    {
+                        row.CurrencyCode, row.PerEventSalesCeilingMinor, row.PerEventSalesCountCeiling,
+                        row.RollingOrganizerSalesCeilingMinor, row.RollingOrganizerSalesCountCeiling,
+                        row.RollingOrganizerWindowDays, row.HighValueReviewThresholdMinor
+                    }).ToArray()
+            }).SingleOrDefaultAsync(cancellationToken);
+        return source is null ? null : PaidEventPolicyVersion.RestoreActiveForPolicyEvaluation(
+            source.Id, source.TenantId, source.VersionNumber, source.IsPaymentsEnabled,
+            source.Kinds.Select(id => (ActorTypeEnum)id), source.RequiresLocalVerification,
+            source.Currencies, source.DefaultCurrencyCode,
+            source.Protections.Select(id => (PaidEventRefundProtection)id),
+            source.Risks.Select(row => PaidEventPolicyCurrencyRiskLimit.Create(
+                row.CurrencyCode, row.PerEventSalesCeilingMinor, row.PerEventSalesCountCeiling,
+                row.RollingOrganizerSalesCeilingMinor, row.RollingOrganizerSalesCountCeiling,
+                row.RollingOrganizerWindowDays, row.HighValueReviewThresholdMinor)),
+            source.RequiresFirstPaidEventReview, source.FarFutureReviewThresholdDays);
+    }
+
     public async Task<PaidEventPolicyVersion[]> ListActiveTenantsAsync(
         int offset,
         int limit,

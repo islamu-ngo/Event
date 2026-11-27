@@ -21,6 +21,51 @@ changes.
 
 ---
 
+## Choose an Export Scope
+
+In Instance settings, choose **Instance only** to download instance configuration.
+This is the default and works without tenants. It also keeps tenant configuration
+out of the file when tenants exist. Choose **Instance and eligible tenants** only
+when the reviewed artifact needs their configuration. A combined export with no
+eligible tenants is valid and contains an empty tenant list.
+
+Choose the view separately. **Overrides** includes explicitly configured values;
+**Portable** includes flattened effective values. Neither view changes the selected
+scope or includes credentials, personal data or operational history. The server
+advertises each permitted download through its HAL links; clients must follow the
+exact advertised link and method.
+
+Independent clients use the existing authenticated export route:
+
+```text
+GET /api/admin/instance/configuration-manifest/export?view=Overrides&scope=Instance
+GET /api/admin/instance/configuration-manifest/export?view=Portable&scope=InstanceAndTenants
+```
+
+Omitting both query parameters selects Overrides and Instance only. Export
+metadata records the scope even when a combined export contains no tenants.
+Downloads remain private, are not cached and must fit the bounded artifact size.
+A tenant configuration package remains a separate artifact for one exact
+authorized tenant; an unavailable target does not become an empty instance export.
+
+Downloads are named as current configuration (`current-instance` in artifact
+metadata), independently of the name of any earlier bootstrap input. Exporting
+does not require access to the operational history of that input.
+
+On PostgreSQL, run the normal application migration/startup preparation with the
+configured Migrator purpose before serving exports. It prepares narrow legal-source
+read permissions and paid-policy configuration columns for the configured Global
+and tenant-bound Runtime purposes. Actor audit fields
+and write permissions are excluded; existing tenant row isolation remains active.
+Tenant branding is read through a prepared branding-only view; Runtime does not
+gain general access to other document payloads, including directory identity.
+Do not compensate for a failed
+export by granting Runtime access to every table or enrolling public exports in
+import-only database roles. The artifact contains current legal source for review;
+it does not restore legal publication history or approvals.
+
+---
+
 ## Prepare Tenant Rows with Configurator
 
 The [Event README](https://github.com/ISLAMU/Event#self-hosting) provides the pinned

@@ -44,6 +44,11 @@ public sealed class ConfigurationManifestOpenApiContractTests(
                 parameter.GetProperty("name").GetString() == "view");
         await Assert.That(view.GetProperty("schema").GetProperty("$ref").GetString())
             .IsEqualTo("#/components/schemas/ConfigurationManifestExportView");
+        JsonElement scope = operation.GetProperty("parameters")
+            .EnumerateArray()
+            .Single(parameter => parameter.GetProperty("name").GetString() == "scope");
+        await Assert.That(scope.GetProperty("schema").GetProperty("$ref").GetString())
+            .IsEqualTo("#/components/schemas/ConfigurationManifestExportScope");
 
         JsonElement content = operation.GetProperty("responses")
             .GetProperty("200")
@@ -67,5 +72,10 @@ public sealed class ConfigurationManifestOpenApiContractTests(
                     "Configuration manifest export view values must be strings."))
             .ToArray())
             .IsEquivalentTo(["Overrides", "Portable"]);
+        JsonElement exportScope = schemas.GetProperty("ConfigurationManifestExportScope");
+        await Assert.That(exportScope.GetProperty("type").GetString()).IsEqualTo("string");
+        await Assert.That(exportScope.GetProperty("enum").EnumerateArray()
+            .Select(value => value.GetString()).ToArray())
+            .IsEquivalentTo(["Instance", "InstanceAndTenants"]);
     }
 }

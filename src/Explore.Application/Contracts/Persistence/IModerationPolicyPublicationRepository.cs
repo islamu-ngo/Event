@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Moderation;
+using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.Moderation.Policy;
 using Explore.Application.Services.Moderation;
 using Explore.Domain;
@@ -35,13 +36,28 @@ public interface IModerationPolicyPublicationRepository
         ModerationConfigurationImportReservationSet reservation, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Reads latest adopted native definitions under the caller's original serializable transaction.
-    /// Instance export requires fenced native platform administration and includes active tenants;
-    /// tenant export is restricted to the actual request tenant. No context impersonation,
-    /// portable mapping, deployment readiness or activation authority is supplied by this read.
+    /// Reads latest adopted definitions under the original public manifest export owner.
+    /// Instance-only scope does not enumerate tenant jurisdictions.
+    /// </summary>
+    Task<IReadOnlyList<ModerationPolicyPublication>> AcquirePublicManifestExportAsync(
+        ConfigurationManifestExportScope scope, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads latest adopted instance definitions under the native import owner's serializable
+    /// transaction and an explicit extent. Tenant targets are rejected; tenant packages use
+    /// <see cref="AcquireTenantPackageExportAsync"/>.
     /// </summary>
     Task<IReadOnlyList<ModerationPolicyPublication>> AcquireConfigurationExportAsync(
-        ConfigurationImportTarget target, CancellationToken cancellationToken = default);
+        ConfigurationImportTarget target, ConfigurationManifestExportScope? instanceScope,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads one active tenant's latest adopted definition, read-only, under the current serializable
+    /// transaction of a tenantless Global context. It takes no row fences and checks no role authority:
+    /// the package export owner re-reads that authority before and after this read.
+    /// </summary>
+    Task<IReadOnlyList<ModerationPolicyPublication>> AcquireTenantPackageExportAsync(
+        Guid tenantId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reads independently authorized native destination entities under the caller's serializable

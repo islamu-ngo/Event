@@ -50,12 +50,14 @@ public static class ConfigurationImportArtifactSnapshotFactory
             Section(
                 "instance.legal_documents",
                 instance.GetProperty("legalDocuments")),
-            TenantProjection("tenant.settings", tenants, "settings"),
-            TenantProjection("tenant.documents", tenants, "documents"),
-            TenantProjection(
-                "tenant.legal_documents",
-                tenants,
-                "legalDocuments")
+            .. manifest.Spec.Tenants.Count == 0
+                ? []
+                : new[]
+                {
+                    TenantProjection("tenant.settings", tenants, "settings"),
+                    TenantProjection("tenant.documents", tenants, "documents"),
+                    TenantProjection("tenant.legal_documents", tenants, "legalDocuments")
+                }
         ];
     }
 

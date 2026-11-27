@@ -10,6 +10,10 @@ public interface IPaidEventPolicyRepository
 
     Task<PaidEventPolicyVersion?> GetActiveTenantAsync(Guid tenantId, CancellationToken cancellationToken);
 
+    /// <summary>Reads an untracked active configuration aggregate without actor audit fields.</summary>
+    Task<PaidEventPolicyVersion?> GetActiveForConfigurationExportAsync(
+        Guid? tenantId, CancellationToken cancellationToken);
+
     /// <summary>
     /// Reads fixed, untracked active tenant validation aggregates in the owning context's
     /// transaction. PostgreSQL uses execute-only ceiling authority, not a second lease.

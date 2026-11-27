@@ -27,7 +27,6 @@ public sealed class ConfigurationManifestExportsController(
     [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.ControlPlanePolicy)]
     [RequestTimeout(RequestTimeoutExtensions.ControlPlanePolicy)]
-    [Produces(ConfigurationManifestExportApiContract.MediaType)]
     [ProducesResponseType<FileContentResult>(
         StatusCodes.Status200OK,
         ConfigurationManifestExportApiContract.MediaType)]
@@ -39,14 +38,16 @@ public sealed class ConfigurationManifestExportsController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     [EndpointSummary("Export configuration manifest")]
     [EndpointDescription(
-        "Downloads the current instance and all active tenants as explicit overrides or a flattened portable view.")]
+        "Downloads instance configuration as overrides or a flattened portable view. Include eligible tenants only with explicit combined scope.")]
     public async Task<FileContentResult> Export(
         [FromQuery] ConfigurationManifestExportView? view = null,
+        [FromQuery] ConfigurationManifestExportScope? scope = null,
         CancellationToken cancellationToken = default)
     {
         ConfigurationManifestExportResult export = await exporter.QueryAsync(
             new ExportConfigurationManifestQuery(
-                view ?? ConfigurationManifestExportView.Overrides),
+                view ?? ConfigurationManifestExportView.Overrides,
+                scope ?? ConfigurationManifestExportScope.Instance),
             cancellationToken);
 
         return File(

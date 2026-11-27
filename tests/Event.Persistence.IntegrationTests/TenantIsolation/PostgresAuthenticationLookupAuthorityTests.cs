@@ -675,7 +675,10 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
             return context;
         }
 
-        internal async Task AssertOrdinaryRoleAsync(ExploreDbContext context)
+        internal Task AssertOrdinaryRoleAsync(ExploreDbContext context) =>
+            AssertOrdinaryRoleAsync(context, RuntimeOptions.Username);
+
+        internal static async Task AssertOrdinaryRoleAsync(ExploreDbContext context, string? expectedLogin)
         {
             context.BindTenantLease();
             await context.Database.OpenConnectionAsync();
@@ -683,7 +686,7 @@ public sealed class PostgresAuthenticationLookupAuthorityTests(PostgreSqlContain
             command.CommandText = "SELECT current_user, rolsuper, rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user";
             await using var reader = await command.ExecuteReaderAsync();
             await Assert.That(await reader.ReadAsync()).IsTrue();
-            await Assert.That(reader.GetString(0)).IsEqualTo(RuntimeOptions.Username);
+            await Assert.That(reader.GetString(0)).IsEqualTo(expectedLogin);
             await Assert.That(reader.GetBoolean(1)).IsFalse();
             await Assert.That(reader.GetBoolean(2)).IsFalse();
         }

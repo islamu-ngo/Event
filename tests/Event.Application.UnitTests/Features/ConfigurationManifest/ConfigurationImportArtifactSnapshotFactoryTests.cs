@@ -7,6 +7,26 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 public sealed class ConfigurationImportArtifactSnapshotFactoryTests
 {
     [Test]
+    public async Task InstanceOnlyManifestDoesNotAdvertiseTenantImportSections()
+    {
+        ConfigurationManifestV1Alpha2 source = ConfigurationManifestTestData.Valid();
+        ConfigurationManifestV1Alpha2 manifest = source with
+        {
+            Spec = source.Spec with { Tenants = [] }
+        };
+
+        var sections = ConfigurationImportArtifactSnapshotFactory.FromManifest(manifest);
+
+        await Assert.That(sections.Select(section => section.SectionKey))
+            .IsEquivalentTo(
+            [
+                "instance.settings",
+                "instance.documents",
+                "instance.legal_documents"
+            ]);
+    }
+
+    [Test]
     public async Task ManifestProjection_CoversAuthoritativeInstanceAndTenantSections()
     {
         ConfigurationManifestV1Alpha2 manifest =

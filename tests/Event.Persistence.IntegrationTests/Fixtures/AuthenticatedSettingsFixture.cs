@@ -78,7 +78,8 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
         Action<SanitizedRequestFailure>? requestFailureObserver = null,
         Action<Dictionary<string, string?>>? configure = null,
         Action<IServiceCollection>? configureServices = null,
-        DeploymentMode deploymentMode = DeploymentMode.SingleTenant)
+        DeploymentMode deploymentMode = DeploymentMode.SingleTenant,
+        bool createDefaultTenant = true)
     {
         await EnvironmentOwner.WaitAsync(TestContext.Current!.Execution.CancellationToken);
         var fixture = new AuthenticatedSettingsFixture(createDatabase);
@@ -162,7 +163,8 @@ internal sealed partial class AuthenticatedSettingsFixture : IAsyncDisposable
                 fixture.SetEnvironment(item.Key.Replace(":", "__", StringComparison.Ordinal), item.Value);
 
             Guid bootstrapActor = await InstanceSettingsCommandFixture.SeedAdministratorAsync(seed);
-            if (!await seed.Tenants.AnyAsync(row => row.Id == PlatformDefaults.DefaultTenantId))
+            if (createDefaultTenant
+                && !await seed.Tenants.AnyAsync(row => row.Id == PlatformDefaults.DefaultTenantId))
                 seed.Tenants.Add(new Tenant
                 {
                     Id = PlatformDefaults.DefaultTenantId,

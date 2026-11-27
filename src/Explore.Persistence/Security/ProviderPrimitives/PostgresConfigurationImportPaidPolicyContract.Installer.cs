@@ -24,6 +24,33 @@ public static partial class PostgresConfigurationImportPaidPolicyContract
         "RequiresFirstPaidEventReview", "FarFutureReviewThresholdDays", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"
     ];
     private static readonly string[] RootUpdates = ["IsActive", "ActiveUniquenessSlot", "UpdatedAt", "UpdatedBy"];
+
+    /// <summary>
+    /// Grants ordinary application readers the configuration columns used by the
+    /// untracked EF projection. Actor audit columns and write authority are excluded.
+    /// Existing forced tenant RLS continues to isolate every root and child relation.
+    /// </summary>
+    public static async Task ApplyConfigurationReadPermissionsAsync(
+        ExploreDbContext context, PostgresNativeQueueEnrollment enrollment, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (!context.Database.IsNpgsql())
+            return;
+        enrollment.Validate();
+        var names = context.GetService<ISqlGenerationHelper>();
+        string logins = string.Join(", ", new[] { enrollment.GlobalLogin, enrollment.RuntimeLogin }
+            .Select(names.DelimitIdentifier));
+        string[] rootRead = RootColumns.Where(property => property is not
+            (nameof(PaidEventPolicyVersion.CreatedAt) or nameof(PaidEventPolicyVersion.CreatedBy)
+             or nameof(PaidEventPolicyVersion.UpdatedAt) or nameof(PaidEventPolicyVersion.UpdatedBy))).ToArray();
+        var relations = new[] { (Type: typeof(PaidEventPolicyVersion), Columns: rootRead) }
+            .Concat(ChildRelations.Select(child => (child.Type, child.Columns)));
+        string grants = string.Join("\n", relations.Select(relation =>
+            $"GRANT SELECT ({string.Join(", ", relation.Columns.Select(property =>
+                Column(context, relation.Type, property)))}) ON TABLE {Table(context, relation.Type)} TO {logins};"));
+        await context.Database.ExecuteSqlRawAsync(grants, ct);
+    }
+
     private static readonly (Type Type, string Navigation, string Operation, string[] Columns)[] ChildRelations =
     [
         (typeof(PaidEventPolicyAllowedOrganizerKind), "AllowedOrganizerKindRows", "kinds",

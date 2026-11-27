@@ -29,6 +29,10 @@ public interface ISystemSettingRepository
         string? category = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Reads only the admitted stored configuration keys on the selected owner.</summary>
+    Task<IReadOnlyList<SystemSetting>> GetByKeysForConfigurationExportAsync(
+        IReadOnlyCollection<string> keys, CancellationToken cancellationToken);
+
     /// <summary>
     /// Checks if a setting exists and is locked.
     /// </summary>

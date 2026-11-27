@@ -182,7 +182,7 @@ public static partial class PostgresHumanAdministratorCommitAuthorityContract
                     AND g.{{C<TenantUserRoleGrant>("RoleScopeId")}} = {{(int)RoleScopeEnum.Tenant}}
                     AND r.{{C<Role>("RoleScopeId")}} = {{(int)RoleScopeEnum.Tenant}});
             """;
-        string caller = CallerGuard(enrollment, tenant);
+        string caller = CallerGuard(enrollment, tenant, subjectOnly);
         string guard = Guard(context, enrollment);
         return $"""
             DECLARE v_allowed boolean := false;
@@ -201,7 +201,7 @@ public static partial class PostgresHumanAdministratorCommitAuthorityContract
             """;
     }
 
-    private static string CallerGuard(PostgresNativeQueueEnrollment enrollment, bool tenant) => $$"""
+    private static string CallerGuard(PostgresNativeQueueEnrollment enrollment, bool tenant, bool subjectOnly) => $$"""
         {{PostgresPrivilegeGuard.RestrictedCallerSql}}
         IF current_user <> '{{OwnerRole}}'
             OR pg_catalog.current_setting('role') NOT IN ('none', session_user::text)
@@ -211,7 +211,7 @@ public static partial class PostgresHumanAdministratorCommitAuthorityContract
                 (p_purpose = 1 AND session_user = {{Text(enrollment.RuntimeLogin)}} AND p_tenant IS NOT NULL)
                 OR (p_purpose = 4 AND session_user = {{Text(enrollment.EmailTenantMutationLogin)}} AND p_tenant IS NOT NULL)
                 {{(tenant ? "" : $"""
-                OR (p_purpose IN (2,5) AND session_user = {Text(enrollment.GlobalLogin)} AND p_tenant IS NULL)
+                OR (p_purpose IN ({(subjectOnly ? "2,5" : "2,5,9")}) AND session_user = {Text(enrollment.GlobalLogin)} AND p_tenant IS NULL)
                 OR (p_purpose = 3 AND session_user = {Text(enrollment.EmailInstanceMutationLogin)} AND p_tenant IS NULL)
                 """)}}
             ), false)

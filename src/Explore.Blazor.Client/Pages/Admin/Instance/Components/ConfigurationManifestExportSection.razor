@@ -21,8 +21,8 @@
         </MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary" dir="auto">
             @T(
-                "instance.configurationManifest.summary",
-                "Download configuration for the whole instance, including every active tenant.")
+                "instance.configurationManifest.scopeSummary",
+                "Download configuration for the whole instance or explicitly include eligible tenant configuration.")
         </MudText>
     </div>
 
@@ -57,6 +57,18 @@
     }
     else
     {
+        <MudRadioGroup T="ConfigurationManifestExportScope"
+                       @bind-Value="_scope"
+                       Disabled="_downloading"
+                       aria-label="@T("instance.configurationManifest.scope.label", "Export scope")">
+            <MudRadio T="ConfigurationManifestExportScope" Value="ConfigurationManifestExportScope.Instance">
+                @T("instance.configurationManifest.scope.instance", "Instance only")
+            </MudRadio>
+            <MudRadio T="ConfigurationManifestExportScope" Value="ConfigurationManifestExportScope.InstanceAndTenants">
+                @T("instance.configurationManifest.scope.combined", "Instance and eligible tenants")
+            </MudRadio>
+        </MudRadioGroup>
+
         @if (CanExportOverrides || CanExportPortable)
         {
             <div class="configuration-manifest-export__actions"
@@ -115,20 +127,15 @@
 @code {
     private readonly CancellationTokenSource _disposal = new();
     private HalResourceOfInstanceOverviewDto? _capabilities;
+    private ConfigurationManifestExportScope _scope = ConfigurationManifestExportScope.Instance;
     private bool _loading = true;
     private bool _downloading;
     private bool _statusIsError;
     private string? _statusMessage;
 
-    private bool CanExportOverrides =>
-        InstanceAdminHal.HasLink(
-            _capabilities?._links,
-            InstanceAdminLinkRelations.ExportConfigurationOverrides);
+    private bool CanExportOverrides => HasCapability(ConfigurationManifestExportView.Overrides);
 
-    private bool CanExportPortable =>
-        InstanceAdminHal.HasLink(
-            _capabilities?._links,
-            InstanceAdminLinkRelations.ExportConfigurationPortable);
+    private bool CanExportPortable => HasCapability(ConfigurationManifestExportView.Portable);
 
     private string T(string key, string fallback) =>
         Translations.T(key, fallback);
@@ -171,7 +178,7 @@
         try
         {
             ConfigurationManifestDownloadResult result =
-                await ExportService.DownloadAsync(view, _disposal.Token);
+                await ExportService.DownloadAsync(view, _scope, _disposal.Token);
             _capabilities = result.Capabilities;
 
             if (!HasCapability(view))
@@ -215,12 +222,9 @@
     }
 
     private bool HasCapability(ConfigurationManifestExportView view) =>
-        view switch
-        {
-            ConfigurationManifestExportView.Overrides => CanExportOverrides,
-            ConfigurationManifestExportView.Portable => CanExportPortable,
-            _ => false
-        };
+        _capabilities?._links?.TryGetValue(
+            InstanceAdminHal.ExportConfigurationRelation(view, _scope), out HalLink? link) == true
+        && string.Equals(link.Method, "GET", StringComparison.OrdinalIgnoreCase);
 
     private async Task ShowFocusedErrorAsync(string message)
     {
